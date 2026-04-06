@@ -366,7 +366,6 @@ No Output Directory named "public" found after the Build completed.
 
 - `ds2api` 可执行文件（Windows 为 `ds2api.exe`）
 - `static/admin/`（WebUI 构建产物）
-- `sha3_wasm_bg.7b9ca65ddd.wasm`（可选；程序内置 embed fallback）
 - `config.example.json`、`.env.example`
 - `README.MD`、`README.en.md`、`LICENSE`
 
@@ -456,8 +455,6 @@ server {
 # 将编译好的二进制文件和相关文件复制到目标目录
 sudo mkdir -p /opt/ds2api
 sudo cp ds2api config.json /opt/ds2api/
-# 可选：若你希望使用外置 WASM 文件（覆盖内置版本，来自 release 包或构建产物）
-# sudo cp /path/to/sha3_wasm_bg.7b9ca65ddd.wasm /opt/ds2api/
 sudo cp -r static/admin /opt/ds2api/static/admin
 ```
 

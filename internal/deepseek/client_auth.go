@@ -109,7 +109,7 @@ func (c *Client) GetPow(ctx context.Context, a *auth.RequestAuth, maxAttempts in
 			data, _ := resp["data"].(map[string]any)
 			bizData, _ := data["biz_data"].(map[string]any)
 			challenge, _ := bizData["challenge"].(map[string]any)
-			answer, err := ComputePow(challenge)
+			answer, err := ComputePow(ctx, challenge)
 			if err != nil {
 				attempts++
 				continue

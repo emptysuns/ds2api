@@ -1,6 +1,7 @@
 package deepseek
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -9,7 +10,7 @@ import (
 )
 
 // ComputePow 使用纯 Go 实现求解 PoW challenge (DeepSeekHashV1)。
-func ComputePow(challenge map[string]any) (int64, error) {
+func ComputePow(ctx context.Context, challenge map[string]any) (int64, error) {
 	algo, _ := challenge["algorithm"].(string)
 	if algo != "DeepSeekHashV1" {
 		return 0, errors.New("unsupported algorithm")
@@ -19,7 +20,7 @@ func ComputePow(challenge map[string]any) (int64, error) {
 	expireAt := toInt64(challenge["expire_at"], 1680000000)
 	difficulty := toInt64FromFloat(challenge["difficulty"], 144000)
 
-	return pow.SolvePow(challengeStr, salt, expireAt, difficulty)
+	return pow.SolvePow(ctx, challengeStr, salt, expireAt, difficulty)
 }
 
 // BuildPowHeader 序列化 {algorithm,challenge,salt,answer,signature,target_path} 为 base64(JSON)。

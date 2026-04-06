@@ -115,7 +115,7 @@ ds2api/
 │   ├── claudeconv/          # Claude 消息格式转换
 │   ├── compat/              # Go 版本兼容与回归测试辅助
 │   ├── config/              # 配置加载、校验与热更新
-│   ├── deepseek/            # DeepSeek 客户端、PoW WASM
+│   ├── deepseek/            # DeepSeek 客户端、PoW 逻辑
 │   ├── js/                  # Node 运行时流式/兼容逻辑
 │   ├── devcapture/          # 开发抓包
 │   ├── format/              # 输出格式化

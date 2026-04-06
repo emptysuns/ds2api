@@ -1,6 +1,7 @@
 package pow
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -9,7 +10,7 @@ import (
 	"strconv"
 )
 
-// Challenge 对应 /api/v0/chat/create_pow_challenge 返回的 data.biz_data.challenge。
+// Challenge 对应 /api/v0/chat/create_pow_challenge 返回 dem data.biz_data.challenge。
 type Challenge struct {
 	Algorithm  string `json:"algorithm"`
 	Challenge  string `json:"challenge"`
@@ -27,7 +28,7 @@ func BuildPrefix(salt string, expireAt int64) string {
 
 // SolvePow 搜索 nonce ∈ [0, difficulty) 使得 DeepSeekHashV1(prefix+str(nonce)) == challenge。
 // prefix 预吸收进 state,循环内零分配。
-func SolvePow(challengeHex, salt string, expireAt, difficulty int64) (int64, error) {
+func SolvePow(ctx context.Context, challengeHex, salt string, expireAt, difficulty int64) (int64, error) {
 	if len(challengeHex) != 64 {
 		return 0, errors.New("pow: challenge must be 64 hex chars")
 	}
@@ -59,6 +60,13 @@ func SolvePow(challengeHex, salt string, expireAt, difficulty int64) (int64, err
 
 	var numBuf [20]byte
 	for n := int64(0); n < difficulty; n++ {
+		// Periodically check if context is canceled to avoid wasting CPU
+		if n&0x3FF == 0 {
+			if err := ctx.Err(); err != nil {
+				return 0, err
+			}
+		}
+
 		v := uint64(n)
 		pos := 20
 		if v == 0 {
@@ -123,7 +131,7 @@ func BuildPowHeader(c *Challenge, answer int64) (string, error) {
 }
 
 // SolveAndBuildHeader 端到端: Challenge → x-ds-pow-response header string。
-func SolveAndBuildHeader(c *Challenge) (string, error) {
+func SolveAndBuildHeader(ctx context.Context, c *Challenge) (string, error) {
 	if c.Algorithm != "DeepSeekHashV1" {
 		return "", errors.New("pow: unsupported algorithm: " + c.Algorithm)
 	}
@@ -131,7 +139,7 @@ func SolveAndBuildHeader(c *Challenge) (string, error) {
 	if d == 0 {
 		d = 144000
 	}
-	answer, err := SolvePow(c.Challenge, c.Salt, c.ExpireAt, d)
+	answer, err := SolvePow(ctx, c.Challenge, c.Salt, c.ExpireAt, d)
 	if err != nil {
 		return "", err
 	}

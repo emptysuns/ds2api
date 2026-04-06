@@ -115,7 +115,7 @@ ds2api/
 │   ├── claudeconv/          # Claude message conversion
 │   ├── compat/              # Go-version compatibility and regression helpers
 │   ├── config/              # Config loading, validation, and hot-reload
-│   ├── deepseek/            # DeepSeek client, PoW WASM
+│   ├── deepseek/            # DeepSeek client, PoW logic
 │   ├── js/                  # Node runtime stream/compat logic
 │   ├── devcapture/          # Dev packet capture
 │   ├── format/              # Output formatting

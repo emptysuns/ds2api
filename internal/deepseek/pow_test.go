@@ -13,7 +13,7 @@ func TestPreloadPowNoOp(t *testing.T) {
 }
 
 func TestComputePowUnsupportedAlgorithm(t *testing.T) {
-	_, err := ComputePow(map[string]any{"algorithm": "unknown"})
+	_, err := ComputePow(context.Background(), map[string]any{"algorithm": "unknown"})
 	if err == nil {
 		t.Fatal("expected error for unsupported algorithm")
 	}

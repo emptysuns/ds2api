@@ -1,6 +1,7 @@
 package pow
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -36,7 +37,7 @@ func TestSolvePow(t *testing.T) {
 		{"abc123salt", 1700000000, 12345, 20000},
 	} {
 		h := DeepSeekHashV1([]byte(BuildPrefix(tc.salt, tc.expire) + strconv.FormatInt(tc.answer, 10)))
-		got, err := SolvePow(hex.EncodeToString(h[:]), tc.salt, tc.expire, tc.diff)
+		got, err := SolvePow(context.Background(), hex.EncodeToString(h[:]), tc.salt, tc.expire, tc.diff)
 		if err != nil || got != tc.answer {
 			t.Errorf("salt=%q answer=%d: got=%d err=%v", tc.salt, tc.answer, got, err)
 		}
@@ -45,7 +46,7 @@ func TestSolvePow(t *testing.T) {
 
 func TestSolveAndBuildHeader(t *testing.T) {
 	t0 := DeepSeekHashV1([]byte("salt_1712345678_777"))
-	header, err := SolveAndBuildHeader(&Challenge{
+	header, err := SolveAndBuildHeader(context.Background(), &Challenge{
 		Algorithm: "DeepSeekHashV1", Challenge: hex.EncodeToString(t0[:]),
 		Salt: "salt", ExpireAt: 1712345678, Difficulty: 2000,
 		Signature: "sig", TargetPath: "/api/v0/chat/completion",
@@ -74,6 +75,6 @@ func BenchmarkSolve(b *testing.B) {
 	h := DeepSeekHashV1([]byte("realisticsalt_1712345678_72000"))
 	ch := hex.EncodeToString(h[:])
 	for i := 0; i < b.N; i++ {
-		_, _ = SolvePow(ch, "realisticsalt", 1712345678, 144000)
+		_, _ = SolvePow(context.Background(), ch, "realisticsalt", 1712345678, 144000)
 	}
 }

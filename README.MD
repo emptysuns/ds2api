@@ -48,7 +48,7 @@ flowchart LR
             Auth["Auth Resolver\n(API key / bearer / x-goog-api-key)"]
             Pool["Account Pool + Queue\n(并发槽位 + 等待队列)"]
             DSClient["DeepSeek Client\n(Session / Auth / HTTP)"]
-            Pow["PoW WASM\n(wazero 预加载)"]
+            Pow["PoW 实现\n(纯 Go 毫秒级)"]
             Tool["Tool Sieve\n(Go/Node 语义对齐)"]
         end
     end
@@ -95,7 +95,7 @@ flowchart LR
 | Gemini 兼容 | `POST /v1beta/models/{model}:generateContent`、`POST /v1beta/models/{model}:streamGenerateContent`（及 `/v1/models/{model}:*` 路径） |
 | 多账号轮询 | 自动 token 刷新、邮箱/手机号双登录方式 |
 | 并发队列控制 | 每账号 in-flight 上限 + 等待队列，动态计算建议并发值 |
-| DeepSeek PoW | WASM 计算（`wazero`），无需外部 Node.js 依赖 |
+| DeepSeek PoW | 纯 Go 高性能实现（DeepSeekHashV1），毫秒级响应 |
 | Tool Calling | 防泄漏处理：非代码块高置信特征识别、`delta.tool_calls` 早发、结构化增量输出 |
 | Admin API | 配置管理、运行时设置热更新、账号测试 / 批量测试、会话清理、导入导出、Vercel 同步、版本检查 |
 | WebUI 管理台 | `/admin` 单页应用（中英文双语、深色模式） |
@@ -344,7 +344,7 @@ cp opencode.json.example opencode.json
 | `DS2API_CONFIG_PATH` | 配置文件路径 | `config.json` |
 | `DS2API_CONFIG_JSON` | 直接注入配置（JSON 或 Base64） | — |
 | `DS2API_ENV_WRITEBACK` | 环境变量模式下自动写回配置文件并切换文件模式（`1/true/yes/on`） | 关闭 |
-| `DS2API_WASM_PATH` | PoW WASM 文件路径 | 自动查找 |
+| `DS2API_POW_CONCURRENCY` | PoW 并行计算协程数（可选） | 默认 CPU 核心数 |
 | `DS2API_STATIC_ADMIN_DIR` | 管理台静态文件目录 | `static/admin` |
 | `DS2API_AUTO_BUILD_WEBUI` | 启动时自动构建 WebUI | 本地开启，Vercel 关闭 |
 | `DS2API_DEV_PACKET_CAPTURE` | 本地开发抓包开关（记录最近会话请求/响应体） | 本地非 Vercel 默认开启 |
@@ -455,7 +455,7 @@ ds2api/
 │   ├── claudeconv/          # Claude 消息格式转换
 │   ├── compat/              # Go 版本兼容与回归测试辅助
 │   ├── config/              # 配置加载、校验与热更新
-│   ├── deepseek/            # DeepSeek API 客户端、PoW WASM
+│   ├── deepseek/            # DeepSeek API 客户端、PoW 逻辑
 │   ├── js/                  # Node 运行时流式处理与兼容逻辑
 │   ├── devcapture/          # 开发抓包模块
 │   ├── rawsample/           # 原始流样本可见文本提取与回放辅助

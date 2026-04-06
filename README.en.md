@@ -48,7 +48,7 @@ flowchart LR
             Auth["Auth Resolver\n(API key / bearer / x-goog-api-key)"]
             Pool["Account Pool + Queue\n(in-flight slots + wait queue)"]
             DSClient["DeepSeek Client\n(session / auth / HTTP)"]
-            Pow["PoW WASM\n(wazero preload)"]
+            Pow["PoW Solver\n(Pure Go ms-level)"]
             Tool["Tool Sieve\n(Go/Node semantic parity)"]
         end
     end
@@ -95,7 +95,7 @@ flowchart LR
 | Gemini compatible | `POST /v1beta/models/{model}:generateContent`, `POST /v1beta/models/{model}:streamGenerateContent` (plus `/v1/models/{model}:*` paths) |
 | Multi-account rotation | Auto token refresh, email/mobile dual login |
 | Concurrency control | Per-account in-flight limit + waiting queue, dynamic recommended concurrency |
-| DeepSeek PoW | WASM solving via `wazero`, no external Node.js dependency |
+| DeepSeek PoW | Pure Go high-performance solver (DeepSeekHashV1), ms-level response |
 | Tool Calling | Anti-leak handling: non-code-block feature match, early `delta.tool_calls`, structured incremental output |
 | Admin API | Config management, runtime settings hot-reload, account testing/batch test, session cleanup, import/export, Vercel sync, version check |
 | WebUI Admin Panel | SPA at `/admin` (bilingual Chinese/English, dark mode) |
@@ -344,7 +344,7 @@ cp opencode.json.example opencode.json
 | `DS2API_CONFIG_PATH` | Config file path | `config.json` |
 | `DS2API_CONFIG_JSON` | Inline config (JSON or Base64) | — |
 | `DS2API_ENV_WRITEBACK` | Auto-write env-backed config to file and transition to file mode (`1/true/yes/on`) | Disabled |
-| `DS2API_WASM_PATH` | PoW WASM file path | Auto-detect |
+| `DS2API_POW_CONCURRENCY` | PoW parallel solver goroutine count (optional) | Default CPU core count |
 | `DS2API_STATIC_ADMIN_DIR` | Admin static assets dir | `static/admin` |
 | `DS2API_AUTO_BUILD_WEBUI` | Auto-build WebUI on startup | Enabled locally, disabled on Vercel |
 | `DS2API_ACCOUNT_MAX_INFLIGHT` | Max in-flight requests per account | `2` |
@@ -453,7 +453,7 @@ ds2api/
 │   ├── claudeconv/          # Claude message format conversion
 │   ├── compat/              # Go-version compatibility and regression helpers
 │   ├── config/              # Config loading, validation, and hot-reload
-│   ├── deepseek/            # DeepSeek API client, PoW WASM
+│   ├── deepseek/            # DeepSeek API client, PoW logic
 │   ├── js/                  # Node runtime stream/compat logic
 │   ├── devcapture/          # Dev packet capture module
 │   ├── rawsample/           # Visible-text extraction and replay helpers for raw stream samples
