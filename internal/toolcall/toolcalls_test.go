@@ -238,6 +238,23 @@ func TestParseToolCallsToleratesDSMLTrailingPipeTagTerminator(t *testing.T) {
 	}
 }
 
+func TestParseToolCallsToleratesDSMLTrailingNovelSeparatorTagTerminator(t *testing.T) {
+	text := strings.Join([]string{
+		`<DSMLtool_calls※>`,
+		`  <DSMLinvoke name="Bash"※>`,
+		`    <DSMLparameter name="command"※><![CDATA[pwd]]></DSMLparameter※>`,
+		`  </DSMLinvoke※>`,
+		`</DSMLtool_calls※>`,
+	}, "\n")
+	calls := ParseToolCalls(text, []string{"Bash"})
+	if len(calls) != 1 {
+		t.Fatalf("expected one trailing-separator DSML call, got %#v", calls)
+	}
+	if calls[0].Name != "Bash" || calls[0].Input["command"] != "pwd" {
+		t.Fatalf("unexpected trailing-separator DSML parse result: %#v", calls[0])
+	}
+}
+
 func TestParseToolCallsToleratesExtraLeadingLessThanBeforeDSML(t *testing.T) {
 	text := `<<|DSML|tool_calls><<|DSML|invoke name="Bash"><<|DSML|parameter name="command"><![CDATA[pwd]]></|DSML|parameter></|DSML|invoke></|DSML|tool_calls>`
 	calls := ParseToolCalls(text, []string{"Bash"})

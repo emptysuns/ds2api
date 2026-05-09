@@ -168,22 +168,22 @@ func scanToolMarkupTagAt(text string, start int) (ToolMarkupTag, bool) {
 		dsmlLike = true
 	}
 	nameEnd := i + nameLen
-	nameEndBeforePipes := nameEnd
-	for next, ok := consumeToolMarkupPipe(text, nameEnd); ok; next, ok = consumeToolMarkupPipe(text, nameEnd) {
+	nameEndBeforeSeparators := nameEnd
+	for next, ok := consumeToolMarkupSeparator(text, nameEnd); ok; next, ok = consumeToolMarkupSeparator(text, nameEnd) {
 		nameEnd = next
 	}
-	hasTrailingPipe := nameEnd > nameEndBeforePipes
+	hasTrailingSeparator := nameEnd > nameEndBeforeSeparators
 	if !hasToolMarkupBoundary(text, nameEnd) {
 		return ToolMarkupTag{}, false
 	}
 	end := findXMLTagEnd(text, nameEnd)
 	if end < 0 {
-		if !hasTrailingPipe {
+		if !hasTrailingSeparator {
 			return ToolMarkupTag{}, false
 		}
 		end = nameEnd - 1
 	}
-	if hasTrailingPipe {
+	if hasTrailingSeparator {
 		if nextLT := strings.IndexByte(text[nameEnd:], '<'); nextLT >= 0 && end >= nameEnd+nextLT {
 			end = nameEnd - 1
 		}
@@ -251,7 +251,7 @@ func consumeToolMarkupNamePrefix(text string, idx int) (int, bool) {
 }
 
 func consumeToolMarkupNamePrefixOnce(text string, idx int) (int, bool) {
-	if next, ok := consumeToolMarkupPipe(text, idx); ok {
+	if next, ok := consumeToolMarkupSeparator(text, idx); ok {
 		return next, true
 	}
 	if idx < len(text) && (text[idx] == ' ' || text[idx] == '\t' || text[idx] == '\r' || text[idx] == '\n') {
@@ -288,7 +288,7 @@ func consumeArbitraryToolMarkupNamePrefix(text string, idx int) (int, bool) {
 	for k < len(text) && (text[k] == ' ' || text[k] == '\t' || text[k] == '\r' || text[k] == '\n') {
 		k++
 	}
-	next, ok := consumeToolMarkupPipe(text, k)
+	next, ok := consumeToolMarkupSeparator(text, k)
 	if !ok {
 		if sep, size := normalizedASCIIAt(text, k); sep == '_' || sep == '-' {
 			next = k + size
@@ -448,26 +448,29 @@ func isToolMarkupTagTerminator(text string, idx int) bool {
 	return normalizeFullwidthASCII(r) == '>'
 }
 
-func consumeToolMarkupPipe(text string, idx int) (int, bool) {
+func consumeToolMarkupSeparator(text string, idx int) (int, bool) {
 	if idx >= len(text) {
 		return idx, false
 	}
-	if text[idx] == '|' {
-		return idx + 1, true
+	r, size := utf8.DecodeRuneInString(text[idx:])
+	if size <= 0 || !isToolMarkupSeparator(r) {
+		return idx, false
 	}
-	if text[idx] == '\x02' {
-		return idx + 1, true
+	return idx + size, true
+}
+
+func isToolMarkupSeparator(r rune) bool {
+	ch := normalizeFullwidthASCII(r)
+	if ch == 0 || ch == '<' || ch == '>' || ch == '/' || ch == '=' || ch == '"' || ch == '\'' || ch == '[' {
+		return false
 	}
-	if strings.HasPrefix(text[idx:], "｜") {
-		return idx + len("｜"), true
+	if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
+		return false
 	}
-	if strings.HasPrefix(text[idx:], "␂") {
-		return idx + len("␂"), true
+	if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+		return false
 	}
-	if ch, size := normalizedASCIIAt(text, idx); ch == '!' {
-		return idx + size, true
-	}
-	return idx, false
+	return true
 }
 
 func consumeToolMarkupLessThan(text string, idx int) (int, bool) {

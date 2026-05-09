@@ -247,6 +247,20 @@ test('parseToolCalls tolerates DSML trailing pipe tag terminator', () => {
   assert.deepEqual(calls[0].input, { command: 'find "/home" -type d', timeout: 10 });
 });
 
+test('parseToolCalls tolerates DSML trailing novel separator tag terminator', () => {
+  const payload = [
+    '<DSMLtool_calls※>',
+    '  <DSMLinvoke name="Bash"※>',
+    '    <DSMLparameter name="command"※><![CDATA[pwd]]></DSMLparameter※>',
+    '  </DSMLinvoke※>',
+    '</DSMLtool_calls※>',
+  ].join('\n');
+  const calls = parseToolCalls(payload, ['Bash']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'Bash');
+  assert.deepEqual(calls[0].input, { command: 'pwd' });
+});
+
 test('parseToolCalls tolerates extra leading less-than before DSML tags', () => {
   const payload = [
     '<<|DSML|tool_calls>',

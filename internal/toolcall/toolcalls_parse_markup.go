@@ -247,17 +247,7 @@ func matchToolCDATAOpenAt(text string, start int) (int, bool) {
 }
 
 func isToolCDATAOpenSeparator(r rune) bool {
-	ch := normalizeFullwidthASCII(r)
-	if ch == 0 || ch == '<' || ch == '>' || ch == '/' || ch == '=' || ch == '"' || ch == '\'' || ch == '[' {
-		return false
-	}
-	if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
-		return false
-	}
-	if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
-		return false
-	}
-	return true
+	return isToolMarkupSeparator(r)
 }
 
 func hasASCIIPrefixFoldAt(text string, start int, prefix string) bool {

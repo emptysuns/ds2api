@@ -464,14 +464,7 @@ function matchCDATAOpenAt(text, start) {
 }
 
 function isCDATAOpenSeparator(ch) {
-  const normalized = normalizeFullwidthASCIIChar(ch || '');
-  if (!normalized || ['<', '>', '/', '=', '"', "'", '['].includes(normalized)) {
-    return false;
-  }
-  if ([' ', '\t', '\n', '\r'].includes(normalized)) {
-    return false;
-  }
-  return !/^[A-Za-z0-9]$/.test(normalized);
+  return isToolMarkupSeparator(ch);
 }
 
 function findCDATAEnd(text, from) {
@@ -528,21 +521,21 @@ function scanToolMarkupTagAt(text, start) {
   }
   const originalNameEnd = i + len;
   let nameEnd = originalNameEnd;
-  while (nameEnd < raw.length && isToolMarkupPipe(raw[nameEnd])) {
+  while (nameEnd < raw.length && isToolMarkupSeparator(raw[nameEnd])) {
     nameEnd += 1;
   }
-  const hasTrailingPipe = nameEnd > originalNameEnd;
+  const hasTrailingSeparator = nameEnd > originalNameEnd;
   if (!hasXmlTagBoundary(raw, nameEnd)) {
     return null;
   }
   let end = findXmlTagEnd(raw, nameEnd);
   if (end < 0) {
-    if (!hasTrailingPipe) {
+    if (!hasTrailingSeparator) {
       return null;
     }
     end = nameEnd - 1;
   }
-  if (hasTrailingPipe) {
+  if (hasTrailingSeparator) {
     const nextLT = raw.indexOf('<', nameEnd);
     if (nextLT >= 0 && end >= nextLT) {
       end = nameEnd - 1;
@@ -635,8 +628,15 @@ function includeDuplicateLeadingLessThan(text, idx) {
   return out;
 }
 
-function isToolMarkupPipe(ch) {
-  return ch === '|' || ch === '｜' || ch === '␂' || ch === '\x02';
+function isToolMarkupSeparator(ch) {
+  const normalized = normalizeFullwidthASCIIChar(ch || '');
+  if (!normalized || ['<', '>', '/', '=', '"', "'", '['].includes(normalized)) {
+    return false;
+  }
+  if ([' ', '\t', '\n', '\r'].includes(normalized)) {
+    return false;
+  }
+  return !/^[A-Za-z0-9]$/.test(normalized);
 }
 
 function isPartialToolMarkupTagPrefix(text) {
@@ -755,7 +755,7 @@ function isToolMarkupTagTerminator(raw, idx) {
 }
 
 function consumeToolMarkupNamePrefixOnce(raw, lower, idx) {
-  if (idx < raw.length && isToolMarkupPipe(raw[idx])) {
+  if (idx < raw.length && isToolMarkupSeparator(raw[idx])) {
     return { next: idx + 1, ok: true };
   }
   if (idx < raw.length && [' ', '\t', '\r', '\n'].includes(raw[idx])) {
@@ -794,7 +794,7 @@ function consumeArbitraryToolMarkupNamePrefix(raw, lower, idx) {
   }
   let next = k;
   let ok = false;
-  if (next < raw.length && isToolMarkupPipe(raw[next])) {
+  if (next < raw.length && isToolMarkupSeparator(raw[next])) {
     next += 1;
     ok = true;
   } else if (next < raw.length && ['_', '-'].includes(normalizeFullwidthASCIIChar(raw[next]))) {

@@ -9,9 +9,6 @@ import (
 
 var toolCallMarkupKVPattern = regexp.MustCompile(`(?is)<(?:[a-z0-9_:-]+:)?([a-z0-9_\-.]+)\b[^>]*>(.*?)</(?:[a-z0-9_:-]+:)?([a-z0-9_\-.]+)>`)
 
-// cdataPattern matches a standalone CDATA section.
-var cdataPattern = regexp.MustCompile(`(?is)^(?:<|〈)(?:!|！)\[CDATA\[(.*?)]](?:>|＞|〉)$`)
-
 func parseMarkupKVObject(text string) map[string]any {
 	matches := toolCallMarkupKVPattern.FindAllStringSubmatch(strings.TrimSpace(text), -1)
 	if len(matches) == 0 {
