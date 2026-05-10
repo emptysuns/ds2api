@@ -143,11 +143,11 @@ func TestHandleVercelStreamPrepareAppliesCurrentInputFile(t *testing.T) {
 }
 
 type vercelReleaseAutoDeleteDSStub struct {
-	resp               *http.Response
-	deleteCallCount    int
-	deletedSessionID   string
-	deletedToken       string
-	deleteErr          error
+	resp             *http.Response
+	deleteCallCount  int
+	deletedSessionID string
+	deletedToken     string
+	deleteErr        error
 }
 
 func (m *vercelReleaseAutoDeleteDSStub) CreateSession(_ context.Context, _ *auth.RequestAuth, _ int) (string, error) {
