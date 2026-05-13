@@ -9,15 +9,26 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/google/uuid"
+
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 )
 
 func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) {
 	clients := c.requestClientsForAccount(acc)
+	deviceID := strings.TrimSpace(acc.DeviceID)
+	if deviceID == "" {
+		deviceID = uuid.New().String()
+		if id := acc.Identifier(); id != "" {
+			if err := c.Store.UpdateAccountDeviceID(id, deviceID); err != nil {
+				config.Logger.Warn("[login] persist device_id failed", "account", id, "error", err)
+			}
+		}
+	}
 	payload := map[string]any{
 		"password":  strings.TrimSpace(acc.Password),
-		"device_id": "deepseek_to_api",
+		"device_id": deviceID,
 		"os":        "android",
 	}
 	if email := strings.TrimSpace(acc.Email); email != "" {

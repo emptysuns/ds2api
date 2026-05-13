@@ -13,13 +13,6 @@ import (
 	"ds2api/internal/promptcompat"
 )
 
-const (
-	currentInputFilename    = promptcompat.CurrentInputContextFilename
-	currentToolsFilename    = promptcompat.CurrentToolsContextFilename
-	currentInputContentType = "text/plain; charset=utf-8"
-	currentInputPurpose     = "assistants"
-)
-
 type CurrentInputConfigReader interface {
 	CurrentInputFileEnabled() bool
 	CurrentInputFileMinChars() int
@@ -56,10 +49,11 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 	if resolvedType, ok := config.GetModelType(stdReq.ResolvedModel); ok {
 		modelType = resolvedType
 	}
+	v := promptcompat.GetCurrentVariant()
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-		Filename:    currentInputFilename,
-		ContentType: currentInputContentType,
-		Purpose:     currentInputPurpose,
+		Filename:    promptcompat.CurrentInputContextFilename(),
+		ContentType: v.ContentType,
+		Purpose:     v.Purpose,
 		ModelType:   modelType,
 		Data:        []byte(fileText),
 	}, 3)
@@ -74,9 +68,9 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 	toolFileID := ""
 	if strings.TrimSpace(toolsText) != "" {
 		result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-			Filename:    currentToolsFilename,
-			ContentType: currentInputContentType,
-			Purpose:     currentInputPurpose,
+			Filename:    promptcompat.CurrentToolsContextFilename(),
+			ContentType: v.ContentType,
+			Purpose:     v.Purpose,
 			ModelType:   modelType,
 			Data:        []byte(toolsText),
 		}, 3)
@@ -103,8 +97,6 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 	stdReq.CurrentToolsFileID = toolFileID
 	stdReq.RefFileIDs = prependUniqueRefFileIDs(stdReq.RefFileIDs, fileID, toolFileID)
 	stdReq.FinalPrompt, stdReq.ToolNames = promptcompat.BuildOpenAIPromptWithToolInstructionsOnly(messages, stdReq.ToolsRaw, "", stdReq.ToolChoice, stdReq.Thinking)
-	// Token accounting must reflect the actual downstream context:
-	// uploaded context files + the continuation live prompt.
 	tokenParts := []string{fileText}
 	if strings.TrimSpace(toolsText) != "" {
 		tokenParts = append(tokenParts, toolsText)
@@ -126,10 +118,11 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 	if resolvedType, ok := config.GetModelType(stdReq.ResolvedModel); ok {
 		modelType = resolvedType
 	}
+	v := promptcompat.GetCurrentVariant()
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-		Filename:    currentInputFilename,
-		ContentType: currentInputContentType,
-		Purpose:     currentInputPurpose,
+		Filename:    promptcompat.CurrentInputContextFilename(),
+		ContentType: v.ContentType,
+		Purpose:     v.Purpose,
 		ModelType:   modelType,
 		Data:        []byte(stdReq.HistoryText),
 	}, 3)
@@ -145,9 +138,9 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 	toolFileID := ""
 	if strings.TrimSpace(toolsText) != "" {
 		result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-			Filename:    currentToolsFilename,
-			ContentType: currentInputContentType,
-			Purpose:     currentInputPurpose,
+			Filename:    promptcompat.CurrentToolsContextFilename(),
+			ContentType: v.ContentType,
+			Purpose:     v.Purpose,
 			ModelType:   modelType,
 			Data:        []byte(toolsText),
 		}, 3)
@@ -186,9 +179,10 @@ func latestUserInputForFile(messages []any) (int, string) {
 }
 
 func currentInputFilePrompt(hasToolsFile bool) string {
-	prompt := "Continue from the latest state in the attached DS2API_HISTORY.txt context. Treat it as the current working state and answer the latest user request directly."
+	v := promptcompat.GetCurrentVariant()
+	prompt := fmt.Sprintf(v.InlinePromptText, v.HistoryFilename)
 	if hasToolsFile {
-		prompt += " Available tool descriptions and parameter schemas are attached in DS2API_TOOLS.txt; use only those tools and follow the tool-call format rules in this prompt."
+		prompt += fmt.Sprintf(" Available tool descriptions and parameter schemas are attached in %s; use only those tools and follow the tool-call format rules in this prompt.", v.ToolsFilename)
 	}
 	return prompt
 }

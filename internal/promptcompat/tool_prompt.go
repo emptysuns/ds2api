@@ -9,10 +9,13 @@ import (
 	"ds2api/internal/toolcall"
 )
 
-const CurrentToolsContextFilename = "DS2API_TOOLS.txt"
+func toolsTranscriptTitle() string {
+	return GetCurrentVariant().ToolsTranscriptTitle
+}
 
-const toolsTranscriptTitle = "# DS2API_TOOLS.txt"
-const toolsTranscriptSummary = "Available tool descriptions and parameter schemas for this request."
+func toolsTranscriptSummary() string {
+	return GetCurrentVariant().ToolsSummary
+}
 
 type toolPromptParts struct {
 	Descriptions string
@@ -40,7 +43,7 @@ func injectToolPromptWithDescriptions(messages []map[string]any, tools []any, po
 	if includeDescriptions && parts.Descriptions != "" {
 		toolPrompt = parts.Descriptions + "\n\n" + toolPrompt
 	} else if !includeDescriptions && parts.Descriptions != "" {
-		toolPrompt = "Available tool descriptions and parameter schemas are attached in DS2API_TOOLS.txt. Treat DS2API_TOOLS.txt as the authoritative list of callable tools and schemas; use only tools and parameters listed there.\n\n" + toolPrompt
+		toolPrompt = fmt.Sprintf("Available tool descriptions and parameter schemas are attached in %s. Treat %s as the authoritative list of callable tools and schemas; use only tools and parameters listed there.\n\n%s", CurrentToolsContextFilename(), CurrentToolsContextFilename(), toolPrompt)
 	}
 
 	for i := range messages {
@@ -120,9 +123,9 @@ func BuildOpenAIToolsContextTranscript(toolsRaw any, policy ToolChoicePolicy) (s
 		return "", parts.Names
 	}
 	var b strings.Builder
-	b.WriteString(toolsTranscriptTitle)
+	b.WriteString(toolsTranscriptTitle())
 	b.WriteString("\n")
-	b.WriteString(toolsTranscriptSummary)
+	b.WriteString(toolsTranscriptSummary())
 	b.WriteString("\n\n")
 	b.WriteString(parts.Descriptions)
 	b.WriteString("\n")

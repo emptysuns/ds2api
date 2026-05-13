@@ -47,7 +47,49 @@ func loadStore() (*Store, error) {
 	if validateErr := ValidateConfig(cfg); validateErr != nil {
 		err = errors.Join(err, validateErr)
 	}
-	return &Store{cfg: cfg, path: ConfigPath(), fromEnv: fromEnv}, err
+	store := &Store{cfg: cfg, path: ConfigPath(), fromEnv: fromEnv}
+	if fromEnv {
+		store.mergePersistedDeviceIDs()
+	}
+	return store, err
+}
+
+// mergePersistedDeviceIDs reads device_id values from the on-disk config file
+// and copies them into the in-memory accounts. This ensures device_id survives
+// restarts even when the primary config is loaded from an environment variable.
+func (s *Store) mergePersistedDeviceIDs() {
+	data, err := os.ReadFile(s.path)
+	if err != nil {
+		return
+	}
+	var fileCfg Config
+	if err := json.Unmarshal(data, &fileCfg); err != nil {
+		return
+	}
+	fileDeviceIDs := map[string]string{}
+	for _, acc := range fileCfg.Accounts {
+		id := acc.Identifier()
+		if id != "" && acc.DeviceID != "" {
+			fileDeviceIDs[id] = acc.DeviceID
+		}
+	}
+	if len(fileDeviceIDs) == 0 {
+		return
+	}
+	merged := 0
+	for i, acc := range s.cfg.Accounts {
+		id := acc.Identifier()
+		if id == "" {
+			continue
+		}
+		if deviceID, ok := fileDeviceIDs[id]; ok && s.cfg.Accounts[i].DeviceID == "" {
+			s.cfg.Accounts[i].DeviceID = deviceID
+			merged++
+		}
+	}
+	if merged > 0 {
+		Logger.Info("[config] merged persisted device_id from file", "count", merged)
+	}
 }
 
 func loadConfig() (Config, bool, error) {
@@ -218,6 +260,31 @@ func (s *Store) UpdateAccountToken(identifier, token string) error {
 		s.accMap[newID] = idx
 	}
 	return s.saveLocked()
+}
+
+func (s *Store) UpdateAccountDeviceID(identifier, deviceID string) error {
+	identifier = strings.TrimSpace(identifier)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx, ok := s.findAccountIndexLocked(identifier)
+	if !ok {
+		return errors.New("account not found")
+	}
+	s.cfg.Accounts[idx].DeviceID = deviceID
+	return s.saveDeviceIDLocked()
+}
+
+// saveDeviceIDLocked writes the full config to disk without the fromEnv guard.
+// Device IDs are auto-generated runtime data, not user-provided configuration,
+// so they must persist regardless of whether the config originated from an env var.
+func (s *Store) saveDeviceIDLocked() error {
+	persistCfg := s.cfg.Clone()
+	persistCfg.ClearAccountTokens()
+	b, err := json.MarshalIndent(persistCfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeConfigBytes(s.path, b)
 }
 
 func (s *Store) Replace(cfg Config) error {

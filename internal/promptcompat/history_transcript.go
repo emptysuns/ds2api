@@ -5,10 +5,13 @@ import (
 	"strings"
 )
 
-const CurrentInputContextFilename = "DS2API_HISTORY.txt"
+func historyTranscriptTitle() string {
+	return GetCurrentVariant().HistoryTranscriptTitle
+}
 
-const historyTranscriptTitle = "# DS2API_HISTORY.txt"
-const historyTranscriptSummary = "Prior conversation history and tool progress."
+func historyTranscriptSummary() string {
+	return GetCurrentVariant().HistorySummary
+}
 
 func BuildOpenAIHistoryTranscript(messages []any) string {
 	return buildOpenAIHistoryTranscript(messages)
@@ -32,9 +35,9 @@ func buildOpenAIHistoryTranscript(messages []any) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(historyTranscriptTitle)
+	b.WriteString(historyTranscriptTitle())
 	b.WriteString("\n")
-	b.WriteString(historyTranscriptSummary)
+	b.WriteString(historyTranscriptSummary())
 	b.WriteString("\n\n")
 
 	entry := 0
@@ -49,7 +52,10 @@ func buildOpenAIHistoryTranscript(messages []any) string {
 			continue
 		}
 		entry++
-		fmt.Fprintf(&b, "=== %d. %s ===\n%s\n\n", entry, strings.ToUpper(roleLabelForHistory(role)), content)
+		v := GetCurrentVariant()
+		sep := v.SectionSeparator
+		num := fmt.Sprintf(v.SectionNumbering, entry)
+		fmt.Fprintf(&b, "%s %s %s %s\n%s\n\n", sep, num, strings.ToUpper(roleLabelForHistory(role)), sep, content)
 	}
 
 	transcript := strings.TrimSpace(b.String())
