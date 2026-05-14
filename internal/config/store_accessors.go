@@ -174,3 +174,21 @@ func (s *Store) ThinkingInjectionPrompt() string {
 	defer s.mu.RUnlock()
 	return strings.TrimSpace(s.cfg.ThinkingInjection.Prompt)
 }
+
+func (s *Store) ClientConfigSnapshot() ClientConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	headers := cloneStringMap(s.cfg.Client.BaseHeaders)
+	if len(headers) == 0 {
+		headers = nil
+	}
+	return ClientConfig{
+		Name:            strings.TrimSpace(s.cfg.Client.Name),
+		Platform:        strings.TrimSpace(s.cfg.Client.Platform),
+		Version:         strings.TrimSpace(s.cfg.Client.Version),
+		AndroidAPILevel: strings.TrimSpace(s.cfg.Client.AndroidAPILevel),
+		Locale:          strings.TrimSpace(s.cfg.Client.Locale),
+		BaseHeaders:     headers,
+	}
+}
+

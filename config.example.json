@@ -54,6 +54,15 @@
     "enabled": true,
     "prompt": ""
   },
+  "client": {
+    "_comment": "客户端身份配置 — 覆盖 constants_shared.json 中的编译期默认值，留空则使用编译期默认值。",
+    "name": "",
+    "platform": "",
+    "version": "",
+    "android_api_level": "",
+    "locale": "",
+    "base_headers": {}
+  },
   "embeddings": {
     "provider": "deterministic"
   },

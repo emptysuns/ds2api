@@ -18,6 +18,7 @@ const DEFAULT_FORM = {
     auto_delete: { mode: 'none' },
     current_input_file: { enabled: true, min_chars: 0 },
     thinking_injection: { enabled: true, prompt: '', default_prompt: '' },
+    client: { name: '', platform: '', version: '', android_api_level: '', locale: '', base_headers_text: '{}' },
     model_aliases_text: '{}',
 }
 
@@ -77,11 +78,19 @@ function fromServerForm(data) {
             prompt: data.thinking_injection?.prompt || '',
             default_prompt: data.thinking_injection?.default_prompt || '',
         },
+        client: {
+            name: data.client?.name || '',
+            platform: data.client?.platform || '',
+            version: data.client?.version || '',
+            android_api_level: data.client?.android_api_level || '',
+            locale: data.client?.locale || '',
+            base_headers_text: JSON.stringify(data.client?.base_headers || {}, null, 2),
+        },
         model_aliases_text: JSON.stringify(data.model_aliases || {}, null, 2),
     }
 }
 
-function toServerPayload(form) {
+function toServerPayload(form, baseHeaders) {
     const currentInputFileEnabled = Boolean(form.current_input_file?.enabled)
     return {
         admin: { jwt_expire_hours: Number(form.admin.jwt_expire_hours) },
@@ -101,6 +110,14 @@ function toServerPayload(form) {
         thinking_injection: {
             enabled: Boolean(form.thinking_injection?.enabled ?? true),
             prompt: String(form.thinking_injection?.prompt || '').trim(),
+        },
+        client: {
+            name: String(form.client?.name || '').trim(),
+            platform: String(form.client?.platform || '').trim(),
+            version: String(form.client?.version || '').trim(),
+            android_api_level: String(form.client?.android_api_level || '').trim(),
+            locale: String(form.client?.locale || '').trim(),
+            base_headers: baseHeaders || {},
         },
     }
 }
@@ -187,8 +204,16 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
             return
         }
 
+        let clientBaseHeaders = {}
+        try {
+            clientBaseHeaders = parseJSONMap(form.client?.base_headers_text || '{}', 'client.base_headers', t)
+        } catch (e) {
+            onMessage('error', e.message)
+            return
+        }
+
         const payload = {
-            ...toServerPayload(form),
+            ...toServerPayload(form, clientBaseHeaders),
             model_aliases: modelAliases,
         }
 

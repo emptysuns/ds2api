@@ -6,7 +6,7 @@ const path = require('path');
 const DEFAULT_CLIENT = Object.freeze({
   name: 'DeepSeek',
   platform: 'android',
-  androidApiLevel: '35',
+  androidApiLevel: '30',
   locale: 'zh_CN',
 });
 

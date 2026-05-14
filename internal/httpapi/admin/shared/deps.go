@@ -37,6 +37,7 @@ type ConfigStore interface {
 	CurrentInputFileMinChars() int
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
+	ClientConfigSnapshot() config.ClientConfig
 	AutoDeleteSessions() bool
 }
 

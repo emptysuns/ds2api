@@ -8,6 +8,7 @@ import (
 
 	authn "ds2api/internal/auth"
 	"ds2api/internal/config"
+	dsprotocol "ds2api/internal/deepseek/protocol"
 )
 
 func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +18,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, aliasMap, err := parseSettingsUpdateRequest(req)
+	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, aliasMap, clientCfg, err := parseSettingsUpdateRequest(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
@@ -82,12 +83,33 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		if aliasMap != nil {
 			c.ModelAliases = aliasMap
 		}
+		if clientCfg != nil {
+			if clientCfg.Name != "" {
+				c.Client.Name = clientCfg.Name
+			}
+			if clientCfg.Platform != "" {
+				c.Client.Platform = clientCfg.Platform
+			}
+			if clientCfg.Version != "" {
+				c.Client.Version = clientCfg.Version
+			}
+			if clientCfg.AndroidAPILevel != "" {
+				c.Client.AndroidAPILevel = clientCfg.AndroidAPILevel
+			}
+			if clientCfg.Locale != "" {
+				c.Client.Locale = clientCfg.Locale
+			}
+			if clientCfg.BaseHeaders != nil {
+				c.Client.BaseHeaders = clientCfg.BaseHeaders
+			}
+		}
 		return nil
 	}); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": err.Error()})
 		return
 	}
 
+	h.applyClientConfig()
 	h.applyRuntimeSettings()
 	needsSync := config.IsVercel() || h.Store.IsEnvBacked()
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -130,6 +152,21 @@ func (h *Handler) updateSettingsPassword(w http.ResponseWriter, r *http.Request)
 		"message":              "password updated",
 		"force_relogin":        true,
 		"jwt_valid_after_unix": now,
+	})
+}
+
+func (h *Handler) applyClientConfig() {
+	if h == nil || h.Store == nil {
+		return
+	}
+	cfg := h.Store.ClientConfigSnapshot()
+	dsprotocol.ApplyClientConfigOverrides(dsprotocol.ClientConfigOverride{
+		Name:            cfg.Name,
+		Platform:        cfg.Platform,
+		Version:         cfg.Version,
+		AndroidAPILevel: cfg.AndroidAPILevel,
+		Locale:          cfg.Locale,
+		BaseHeaders:     cfg.BaseHeaders,
 	})
 }
 

@@ -7,6 +7,7 @@ import RuntimeSection from './RuntimeSection'
 import BehaviorSection from './BehaviorSection'
 import CurrentInputFileSection from './CurrentInputFileSection'
 import AutoDeleteSection from './AutoDeleteSection'
+import ClientSection from './ClientSection'
 import ModelSection from './ModelSection'
 import BackupSection from './BackupSection'
 
@@ -98,6 +99,8 @@ export default function SettingsContainer({ onRefresh, onMessage, authFetch, onF
             <CurrentInputFileSection t={t} form={form} setForm={setForm} />
 
             <AutoDeleteSection t={t} form={form} setForm={setForm} />
+
+            <ClientSection t={t} form={form} setForm={setForm} />
 
             <ModelSection t={t} form={form} setForm={setForm} />
 

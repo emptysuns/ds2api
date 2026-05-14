@@ -49,6 +49,57 @@ var BaseHeaders = map[string]string{}
 var SkipContainsPatterns = cloneStringSlice(defaultSkipContainsPatterns)
 var SkipExactPathSet = toStringSet(defaultSkipExactPaths)
 
+// embeddedDefaults caches the parsed embedded constants for later merging
+// with runtime config overrides.
+var embeddedDefaults sharedConstants
+
+// ApplyClientConfigOverrides merges user-provided client identification overrides
+// from config.json into the runtime globals. Non-empty fields override the
+// embedded defaults. The BaseHeaders map is replaced atomically so concurrent
+// readers always see a complete map.
+func ApplyClientConfigOverrides(cfg ClientConfigOverride) {
+	client := embeddedDefaults.Client
+	if cfg.Name != "" {
+		client.Name = cfg.Name
+	}
+	if cfg.Platform != "" {
+		client.Platform = cfg.Platform
+	}
+	if cfg.Version != "" {
+		client.Version = cfg.Version
+	}
+	if cfg.AndroidAPILevel != "" {
+		client.AndroidAPILevel = cfg.AndroidAPILevel
+	}
+	if cfg.Locale != "" {
+		client.Locale = cfg.Locale
+	}
+
+	headers := cloneStringMap(defaultStaticBaseHeaders)
+	for k, v := range embeddedDefaults.BaseHeaders {
+		headers[k] = v
+	}
+	for k, v := range cfg.BaseHeaders {
+		if k == "" || v == "" {
+			continue
+		}
+		headers[k] = v
+	}
+
+	headers = buildBaseHeaders(client, headers)
+	BaseHeaders = headers
+	ClientVersion = client.Version
+}
+
+type ClientConfigOverride struct {
+	Name            string
+	Platform        string
+	Version         string
+	AndroidAPILevel string
+	Locale          string
+	BaseHeaders     map[string]string
+}
+
 type clientConstants struct {
 	Name            string `json:"name"`
 	Platform        string `json:"platform"`
@@ -72,6 +123,7 @@ func init() {
 	if err := json.Unmarshal(sharedConstantsJSON, &cfg); err != nil {
 		panic(fmt.Errorf("load DeepSeek shared constants: %w", err))
 	}
+	embeddedDefaults = cfg
 	applySharedConstants(cfg)
 }
 

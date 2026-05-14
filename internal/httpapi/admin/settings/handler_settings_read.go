@@ -39,8 +39,27 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"prompt":         h.Store.ThinkingInjectionPrompt(),
 			"default_prompt": promptcompat.DefaultThinkingInjectionPrompt,
 		},
-		"model_aliases":     snap.ModelAliases,
-		"env_backed":        h.Store.IsEnvBacked(),
+		"model_aliases": snap.ModelAliases,
+		"client": map[string]any{
+			"name":              snap.Client.Name,
+			"platform":          snap.Client.Platform,
+			"version":           snap.Client.Version,
+			"android_api_level": snap.Client.AndroidAPILevel,
+			"locale":            snap.Client.Locale,
+			"base_headers":      baseHeadersMap(snap.Client.BaseHeaders),
+		},
+		"env_backed": h.Store.IsEnvBacked(),
 		"needs_vercel_sync": needsSync,
 	})
+}
+
+func baseHeadersMap(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }

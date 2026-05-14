@@ -20,6 +20,7 @@ import (
 	"ds2api/internal/chathistory"
 	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
+	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/httpapi/admin"
 	"ds2api/internal/httpapi/claude"
 	"ds2api/internal/httpapi/gemini"
@@ -46,6 +47,7 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
+	applyClientConfigFromStore(store)
 	pool := account.NewPool(store)
 	var dsClient *dsclient.Client
 	resolver := auth.NewResolver(store, pool, func(ctx context.Context, acc config.Account) (string, error) {
@@ -404,6 +406,21 @@ func addVaryHeaderToken(h http.Header, token string) {
 		merged = append(merged, token)
 	}
 	h.Set("Vary", strings.Join(merged, ", "))
+}
+
+func applyClientConfigFromStore(store *config.Store) {
+	if store == nil {
+		return
+	}
+	cfg := store.ClientConfigSnapshot()
+	dsprotocol.ApplyClientConfigOverrides(dsprotocol.ClientConfigOverride{
+		Name:            cfg.Name,
+		Platform:        cfg.Platform,
+		Version:         cfg.Version,
+		AndroidAPILevel: cfg.AndroidAPILevel,
+		Locale:          cfg.Locale,
+		BaseHeaders:     cfg.BaseHeaders,
+	})
 }
 
 func WriteUnhandledError(w http.ResponseWriter, err error) {

@@ -3,7 +3,7 @@
     "name": "DeepSeek",
     "platform": "android",
     "version": "2.1.0",
-    "android_api_level": "35",
+    "android_api_level": "30",
     "locale": "zh_CN"
   },
   "base_headers": {
