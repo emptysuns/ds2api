@@ -262,6 +262,18 @@ func (s *Store) UpdateAccountToken(identifier, token string) error {
 	return s.saveLocked()
 }
 
+func (s *Store) UpdateAccountRangersID(identifier, rangersID string) error {
+	identifier = strings.TrimSpace(identifier)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx, ok := s.findAccountIndexLocked(identifier)
+	if !ok {
+		return errors.New("account not found")
+	}
+	s.cfg.Accounts[idx].RangersID = rangersID
+	return s.saveDeviceIDLocked()
+}
+
 func (s *Store) UpdateAccountDeviceID(identifier, deviceID string) error {
 	identifier = strings.TrimSpace(identifier)
 	s.mu.Lock()

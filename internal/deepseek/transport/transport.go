@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 
 	utls "github.com/refraction-networking/utls"
@@ -41,7 +42,7 @@ func NewWithDialContext(timeout time.Duration, dialContext DialContextFunc) *Cli
 	if useEnvProxy {
 		base.Proxy = http.ProxyFromEnvironment
 	}
-	return &Client{http: &http.Client{Timeout: timeout, Transport: base}}
+	return &Client{http: &http.Client{Timeout: timeout, Transport: base, Jar: newCookieJar()}}
 }
 
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
@@ -64,7 +65,12 @@ func NewFallbackClient(timeout time.Duration, dialContext DialContextFunc) *http
 	if useEnvProxy {
 		base.Proxy = http.ProxyFromEnvironment
 	}
-	return &http.Client{Timeout: timeout, Transport: base}
+	return &http.Client{Timeout: timeout, Transport: base, Jar: newCookieJar()}
+}
+
+func newCookieJar() *cookiejar.Jar {
+	jar, _ := cookiejar.New(nil)
+	return jar
 }
 
 func androidTLSDialer(dialContext DialContextFunc) func(ctx context.Context, network, addr string) (net.Conn, error) {

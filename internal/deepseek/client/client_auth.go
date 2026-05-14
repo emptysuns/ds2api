@@ -2,10 +2,13 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
 	dsprotocol "ds2api/internal/deepseek/protocol"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -23,6 +26,15 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 		if id := acc.Identifier(); id != "" {
 			if err := c.Store.UpdateAccountDeviceID(id, deviceID); err != nil {
 				config.Logger.Warn("[login] persist device_id failed", "account", id, "error", err)
+			}
+		}
+	}
+	rangersID := strings.TrimSpace(acc.RangersID)
+	if rangersID == "" {
+		rangersID = generateRangersID()
+		if id := acc.Identifier(); id != "" {
+			if err := c.Store.UpdateAccountRangersID(id, rangersID); err != nil {
+				config.Logger.Warn("[login] persist rangers_id failed", "account", id, "error", err)
 			}
 		}
 	}
@@ -69,8 +81,8 @@ func (c *Client) CreateSession(ctx context.Context, a *auth.RequestAuth, maxAtte
 	attempts := 0
 	refreshed := false
 	for attempts < maxAttempts {
-		headers := c.authHeaders(a.DeepSeekToken)
-		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreateSessionURL, headers, map[string]any{"agent": "chat"})
+		headers := c.authHeaders(a.DeepSeekToken, a)
+		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreateSessionURL, headers, nil)
 		if err != nil {
 			config.Logger.Warn("[create_session] request error", "error", err, "account", a.AccountID)
 			attempts++
@@ -120,7 +132,7 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 	lastFailureKind := FailureUnknown
 	lastFailureMessage := ""
 	for attempts < maxAttempts {
-		headers := c.authHeaders(a.DeepSeekToken)
+		headers := c.authHeaders(a.DeepSeekToken, a)
 		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreatePowURL, headers, map[string]any{"target_path": targetPath})
 		if err != nil {
 			config.Logger.Warn("[get_pow] request error", "error", err, "account", a.AccountID, "target_path", targetPath)
@@ -169,13 +181,24 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 	return "", errors.New("get pow failed")
 }
 
-func (c *Client) authHeaders(token string) map[string]string {
-	headers := make(map[string]string, len(dsprotocol.BaseHeaders)+1)
+func (c *Client) authHeaders(token string, a *auth.RequestAuth) map[string]string {
+	headers := make(map[string]string, len(dsprotocol.BaseHeaders)+3)
 	for k, v := range dsprotocol.BaseHeaders {
 		headers[k] = v
 	}
 	headers["authorization"] = "Bearer " + token
+	if a != nil && a.Account.RangersID != "" {
+		headers["x-rangers-id"] = a.Account.RangersID
+	}
 	return headers
+}
+
+func generateRangersID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return ""
+	}
+	return strconv.FormatUint(binary.BigEndian.Uint64(b[:]), 10)
 }
 
 func isTokenInvalid(status int, code int, bizCode int, msg string, bizMsg string) bool {

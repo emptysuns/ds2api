@@ -2,10 +2,13 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -270,7 +273,21 @@ func (r *Resolver) ensureManagedToken(ctx context.Context, a *RequestAuth) error
 		return nil
 	}
 	a.DeepSeekToken = a.Account.Token
+	if a.Account.RangersID == "" {
+		a.Account.RangersID = generateRangersIDForAuth()
+		if a.AccountID != "" && r.Store != nil {
+			_ = r.Store.UpdateAccountRangersID(a.AccountID, a.Account.RangersID)
+		}
+	}
 	return nil
+}
+
+func generateRangersIDForAuth() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return ""
+	}
+	return strconv.FormatUint(binary.BigEndian.Uint64(b[:]), 10)
 }
 
 func (r *Resolver) shouldForceRefresh(accountID string) bool {

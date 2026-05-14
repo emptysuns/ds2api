@@ -35,7 +35,8 @@ type Account struct {
 	Password string `json:"password,omitempty"`
 	Token    string `json:"token,omitempty"`
 	ProxyID  string `json:"proxy_id,omitempty"`
-	DeviceID string `json:"device_id,omitempty"`
+	DeviceID  string `json:"device_id,omitempty"`
+	RangersID string `json:"rangers_id,omitempty"`
 }
 
 type APIKey struct {
