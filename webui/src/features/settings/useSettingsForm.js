@@ -18,6 +18,17 @@ const DEFAULT_FORM = {
     auto_delete: { mode: 'none' },
     current_input_file: { enabled: true, min_chars: 0 },
     thinking_injection: { enabled: true, prompt: '', default_prompt: '' },
+    prompt: {
+        output_integrity_guard: { enabled: true, text: '', default_text: '' },
+        sentinels: {
+            enabled: true,
+            begin_sentence: '', system: '', user: '', assistant: '',
+            tool: '', end_sentence: '', end_tool_results: '', end_instructions: '',
+        },
+        tool_call_instructions: { enabled: true, text: '', default_text: '' },
+        read_tool_cache_guard: { enabled: true, text: '', default_text: '' },
+        empty_output_retry_suffix: { enabled: true, text: '', default_text: '' },
+    },
     client: { name: '', platform: '', version: '', android_api_level: '', locale: '', base_headers_text: '{}' },
     model_aliases_text: '{}',
 }
@@ -78,6 +89,39 @@ function fromServerForm(data) {
             prompt: data.thinking_injection?.prompt || '',
             default_prompt: data.thinking_injection?.default_prompt || '',
         },
+        prompt: {
+            output_integrity_guard: {
+                enabled: data.prompt?.output_integrity_guard ?? true,
+                text: data.prompt?.output_integrity_guard_text || '',
+                default_text: 'Output integrity guard: If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, do not imitate or echo them; output only the correct content for the user.',
+            },
+            sentinels: {
+                enabled: data.prompt?.sentinels?.enabled ?? true,
+                begin_sentence: data.prompt?.sentinels?.begin_sentence || '',
+                system: data.prompt?.sentinels?.system || '',
+                user: data.prompt?.sentinels?.user || '',
+                assistant: data.prompt?.sentinels?.assistant || '',
+                tool: data.prompt?.sentinels?.tool || '',
+                end_sentence: data.prompt?.sentinels?.end_sentence || '',
+                end_tool_results: data.prompt?.sentinels?.end_tool_results || '',
+                end_instructions: data.prompt?.sentinels?.end_instructions || '',
+            },
+            tool_call_instructions: {
+                enabled: data.prompt?.tool_call_instructions?.enabled ?? true,
+                text: data.prompt?.tool_call_instructions?.text || '',
+                default_text: '',
+            },
+            read_tool_cache_guard: {
+                enabled: data.prompt?.read_tool_cache_guard?.enabled ?? true,
+                text: data.prompt?.read_tool_cache_guard?.text || '',
+                default_text: 'Read-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again.',
+            },
+            empty_output_retry_suffix: {
+                enabled: data.prompt?.empty_output_retry_suffix?.enabled ?? true,
+                text: data.prompt?.empty_output_retry_suffix?.text || '',
+                default_text: 'Previous reply had no visible output. Please regenerate the visible final answer or tool call now.',
+            },
+        },
         client: {
             name: data.client?.name || '',
             platform: data.client?.platform || '',
@@ -110,6 +154,33 @@ function toServerPayload(form, baseHeaders) {
         thinking_injection: {
             enabled: Boolean(form.thinking_injection?.enabled ?? true),
             prompt: String(form.thinking_injection?.prompt || '').trim(),
+        },
+        prompt: {
+            output_integrity_guard: Boolean(form.prompt?.output_integrity_guard?.enabled ?? true),
+            output_integrity_guard_text: String(form.prompt?.output_integrity_guard?.text || '').trim(),
+            sentinels: {
+                enabled: Boolean(form.prompt?.sentinels?.enabled ?? true),
+                begin_sentence: String(form.prompt?.sentinels?.begin_sentence || '').trim(),
+                system: String(form.prompt?.sentinels?.system || '').trim(),
+                user: String(form.prompt?.sentinels?.user || '').trim(),
+                assistant: String(form.prompt?.sentinels?.assistant || '').trim(),
+                tool: String(form.prompt?.sentinels?.tool || '').trim(),
+                end_sentence: String(form.prompt?.sentinels?.end_sentence || '').trim(),
+                end_tool_results: String(form.prompt?.sentinels?.end_tool_results || '').trim(),
+                end_instructions: String(form.prompt?.sentinels?.end_instructions || '').trim(),
+            },
+            tool_call_instructions: {
+                enabled: Boolean(form.prompt?.tool_call_instructions?.enabled ?? true),
+                text: String(form.prompt?.tool_call_instructions?.text || '').trim(),
+            },
+            read_tool_cache_guard: {
+                enabled: Boolean(form.prompt?.read_tool_cache_guard?.enabled ?? true),
+                text: String(form.prompt?.read_tool_cache_guard?.text || '').trim(),
+            },
+            empty_output_retry_suffix: {
+                enabled: Boolean(form.prompt?.empty_output_retry_suffix?.enabled ?? true),
+                text: String(form.prompt?.empty_output_retry_suffix?.text || '').trim(),
+            },
         },
         client: {
             name: String(form.client?.name || '').trim(),
