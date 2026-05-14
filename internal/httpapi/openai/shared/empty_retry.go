@@ -2,10 +2,23 @@ package shared
 
 import "strings"
 
-const EmptyOutputRetrySuffix = "Previous reply had no visible output. Please regenerate the visible final answer or tool call now."
+var EmptyOutputRetrySuffixEnabled = true
+
+var EmptyOutputRetrySuffixText = ""
+
+const defaultEmptyOutputRetrySuffix = "Previous reply had no visible output. Please regenerate the visible final answer or tool call now."
+
+const DefaultEmptyOutputRetrySuffix = defaultEmptyOutputRetrySuffix
+
+func EmptyOutputRetrySuffix() string {
+	if strings.TrimSpace(EmptyOutputRetrySuffixText) != "" {
+		return strings.TrimSpace(EmptyOutputRetrySuffixText)
+	}
+	return defaultEmptyOutputRetrySuffix
+}
 
 func EmptyOutputRetryEnabled() bool {
-	return true
+	return EmptyOutputRetrySuffixEnabled
 }
 
 func EmptyOutputRetryMaxAttempts() int {
@@ -36,9 +49,9 @@ func ClonePayloadForEmptyOutputRetry(payload map[string]any, parentMessageID int
 func AppendEmptyOutputRetrySuffix(prompt string) string {
 	prompt = strings.TrimRight(prompt, "\r\n\t ")
 	if prompt == "" {
-		return EmptyOutputRetrySuffix
+		return EmptyOutputRetrySuffix()
 	}
-	return prompt + "\n\n" + EmptyOutputRetrySuffix
+	return prompt + "\n\n" + EmptyOutputRetrySuffix()
 }
 
 func UsagePromptWithEmptyOutputRetry(originalPrompt string, retryAttempts int) string {

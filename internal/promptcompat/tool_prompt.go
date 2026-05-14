@@ -9,6 +9,14 @@ import (
 	"ds2api/internal/toolcall"
 )
 
+// ReadToolCacheGuardEnabled controls whether the read-tool cache guard text
+// is appended when read-style tools are present. Default true.
+var ReadToolCacheGuardEnabled = true
+
+// ReadToolCacheGuardText allows overriding the default read-tool cache guard text.
+// When empty, the built-in default is used.
+var ReadToolCacheGuardText = ""
+
 func toolsTranscriptTitle() string {
 	return GetCurrentVariant().ToolsTranscriptTitle
 }
@@ -93,8 +101,12 @@ func buildToolPromptParts(tools []any, policy ToolChoicePolicy) toolPromptParts 
 	}
 	descriptions := "You have access to these tools:\n\n" + strings.Join(toolSchemas, "\n\n")
 	instructions := toolcall.BuildToolCallInstructions(names)
-	if hasReadLikeTool(names) {
-		instructions += "\n\nRead-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again."
+	if ReadToolCacheGuardEnabled && hasReadLikeTool(names) {
+		guard := strings.TrimSpace(ReadToolCacheGuardText)
+		if guard == "" {
+			guard = "Read-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again."
+		}
+		instructions += "\n\n" + guard
 	}
 	if policy.Mode == ToolChoiceRequired {
 		instructions += "\n7) For this response, you MUST call at least one tool from the allowed list."

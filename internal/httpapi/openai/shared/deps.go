@@ -45,6 +45,15 @@ type ConfigReader interface {
 	CurrentInputFileMinChars() int
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
+	OutputIntegrityGuardEnabled() bool
+	SentinelsEnabled() bool
+	SentinelOverrides() config.SentinelConfig
+	ToolCallInstructionsEnabled() bool
+	ToolCallInstructionsText() string
+	ReadToolCacheGuardEnabled() bool
+	ReadToolCacheGuardText() string
+	EmptyOutputRetrySuffixEnabled() bool
+	EmptyOutputRetrySuffixText() string
 }
 
 type Deps struct {

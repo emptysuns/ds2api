@@ -21,7 +21,7 @@ func boolFrom(v any) bool {
 	}
 }
 
-func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *config.RuntimeConfig, *config.ResponsesConfig, *config.EmbeddingsConfig, *config.AutoDeleteConfig, *config.CurrentInputFileConfig, *config.ThinkingInjectionConfig, map[string]string, *config.ClientConfig, error) {
+func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *config.RuntimeConfig, *config.ResponsesConfig, *config.EmbeddingsConfig, *config.AutoDeleteConfig, *config.CurrentInputFileConfig, *config.ThinkingInjectionConfig, *config.PromptConfig, map[string]string, *config.ClientConfig, error) {
 	var (
 		adminCfg        *config.AdminConfig
 		runtimeCfg      *config.RuntimeConfig
@@ -30,6 +30,7 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		autoDeleteCfg   *config.AutoDeleteConfig
 		currentInputCfg *config.CurrentInputFileConfig
 		thinkingInjCfg  *config.ThinkingInjectionConfig
+		promptCfg       *config.PromptConfig
 		aliasMap        map[string]string
 		clientCfg       *config.ClientConfig
 	)
@@ -39,7 +40,7 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		if v, exists := raw["jwt_expire_hours"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("admin.jwt_expire_hours", n, 1, 720, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.JWTExpireHours = n
 		}
@@ -51,33 +52,33 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		if v, exists := raw["account_max_inflight"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("runtime.account_max_inflight", n, 1, 256, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.AccountMaxInflight = n
 		}
 		if v, exists := raw["account_max_queue"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("runtime.account_max_queue", n, 1, 200000, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.AccountMaxQueue = n
 		}
 		if v, exists := raw["global_max_inflight"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("runtime.global_max_inflight", n, 1, 200000, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.GlobalMaxInflight = n
 		}
 		if v, exists := raw["token_refresh_interval_hours"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("runtime.token_refresh_interval_hours", n, 1, 720, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.TokenRefreshIntervalHours = n
 		}
 		if cfg.AccountMaxInflight > 0 && cfg.GlobalMaxInflight > 0 && cfg.GlobalMaxInflight < cfg.AccountMaxInflight {
-			return nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("runtime.global_max_inflight must be >= runtime.account_max_inflight")
+			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("runtime.global_max_inflight must be >= runtime.account_max_inflight")
 		}
 		runtimeCfg = cfg
 	}
@@ -87,7 +88,7 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		if v, exists := raw["store_ttl_seconds"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("responses.store_ttl_seconds", n, 30, 86400, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.StoreTTLSeconds = n
 		}
@@ -99,7 +100,7 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		if v, exists := raw["provider"]; exists {
 			p := strings.TrimSpace(fmt.Sprintf("%v", v))
 			if err := config.ValidateTrimmedString("embeddings.provider", p, false); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.Provider = p
 		}
@@ -125,7 +126,7 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		if v, exists := raw["mode"]; exists {
 			mode := strings.ToLower(strings.TrimSpace(fmt.Sprintf("%v", v)))
 			if err := config.ValidateAutoDeleteMode(mode); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			if mode == "" {
 				mode = "none"
@@ -147,12 +148,12 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		if v, exists := raw["min_chars"]; exists {
 			n := intFrom(v)
 			if err := config.ValidateIntRange("current_input_file.min_chars", n, 0, 100000000, true); err != nil {
-				return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 			}
 			cfg.MinChars = n
 		}
 		if err := config.ValidateCurrentInputFileConfig(*cfg); err != nil {
-			return nil, nil, nil, nil, nil, nil, nil, nil, nil, err
+			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, err
 		}
 		currentInputCfg = cfg
 	}
@@ -167,6 +168,30 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 			cfg.Prompt = strings.TrimSpace(fmt.Sprintf("%v", v))
 		}
 		thinkingInjCfg = cfg
+	}
+
+	if raw, ok := req["prompt"].(map[string]any); ok {
+		cfg := &config.PromptConfig{}
+		if v, exists := raw["output_integrity_guard"]; exists {
+			b := boolFrom(v)
+			cfg.OutputIntegrityGuard = &b
+		}
+		if v, exists := raw["output_integrity_guard_text"]; exists {
+			cfg.OutputIntegrityGuardText = strings.TrimSpace(fmt.Sprintf("%v", v))
+		}
+		if v, exists := raw["sentinels"]; exists {
+			cfg.Sentinels = parseSentinelConfig(v)
+		}
+		if v, exists := raw["tool_call_instructions"]; exists {
+			cfg.ToolCallInstructions = parseTextBlockConfig(v)
+		}
+		if v, exists := raw["read_tool_cache_guard"]; exists {
+			cfg.ReadToolCacheGuard = parseTextBlockConfig(v)
+		}
+		if v, exists := raw["empty_output_retry_suffix"]; exists {
+			cfg.EmptyOutputRetrySuffix = parseTextBlockConfig(v)
+		}
+		promptCfg = cfg
 	}
 
 	if raw, ok := req["client"].(map[string]any); ok {
@@ -200,5 +225,64 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 		clientCfg = cfg
 	}
 
-	return adminCfg, runtimeCfg, respCfg, embCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, aliasMap, clientCfg, nil
+	return adminCfg, runtimeCfg, respCfg, embCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, promptCfg, aliasMap, clientCfg, nil
+}
+
+func parseSentinelConfig(v any) *config.SentinelConfig {
+	raw, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	cfg := &config.SentinelConfig{}
+	if v, exists := raw["enabled"]; exists {
+		b := boolFrom(v)
+		cfg.Enabled = &b
+	}
+	if v, exists := raw["begin_sentence"]; exists {
+		cfg.BeginSentence = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["system"]; exists {
+		cfg.System = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["user"]; exists {
+		cfg.User = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["assistant"]; exists {
+		cfg.Assistant = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["tool"]; exists {
+		cfg.Tool = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["end_sentence"]; exists {
+		cfg.EndSentence = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["end_tool_results"]; exists {
+		cfg.EndToolResults = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	if v, exists := raw["end_instructions"]; exists {
+		cfg.EndInstructions = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	return cfg
+}
+
+func parseTextBlockConfig(v any) *config.TextBlockConfig {
+	raw, ok := v.(map[string]any)
+	if !ok {
+		if b, ok := v.(bool); ok {
+			return &config.TextBlockConfig{Enabled: &b}
+		}
+		if s, ok := v.(string); ok {
+			return &config.TextBlockConfig{Text: s}
+		}
+		return nil
+	}
+	cfg := &config.TextBlockConfig{}
+	if v, exists := raw["enabled"]; exists {
+		b := boolFrom(v)
+		cfg.Enabled = &b
+	}
+	if v, exists := raw["text"]; exists {
+		cfg.Text = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	return cfg
 }

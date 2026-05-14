@@ -9,17 +9,33 @@ import (
 
 var markdownImagePattern = regexp.MustCompile(`!\[(.*?)\]\((.*?)\)`)
 
+// OutputIntegrityGuardEnabled controls whether the output integrity guard
+// system message is prepended to every prompt. Default true (backward compatible).
+// Set to false via config prompt.output_integrity_guard to disable.
+var OutputIntegrityGuardEnabled = true
+
+// OutputIntegrityGuardText allows customizing the guard message text.
+// When empty, the default text is used.
+var OutputIntegrityGuardText = ""
+
+// SentinelEnabled controls whether sentinel markers (<|begin_of_sentence|>, etc.)
+// wrap messages. When false, messages are concatenated raw without markers.
+var SentinelEnabled = true
+
+var (
+	SentinelBeginSentence    = "<|begin▁of▁sentence|>"
+	SentinelSystem           = "<|System|>"
+	SentinelUser             = "<|User|>"
+	SentinelAssistant        = "<|Assistant|>"
+	SentinelTool             = "<|Tool|>"
+	SentinelEndSentence      = "<|end▁of▁sentence|>"
+	SentinelEndToolResults   = "<|end▁of▁toolresults|>"
+	SentinelEndInstructions  = "<|end▁of▁instructions|>"
+)
+
 const (
-	beginSentenceMarker        = "<|begin▁of▁sentence|>"
-	systemMarker               = "<|System|>"
-	userMarker                 = "<|User|>"
-	assistantMarker            = "<|Assistant|>"
-	toolMarker                 = "<|Tool|>"
-	endSentenceMarker          = "<|end▁of▁sentence|>"
-	endToolResultsMarker       = "<|end▁of▁toolresults|>"
-	endInstructionsMarker      = "<|end▁of▁instructions|>"
 	outputIntegrityGuardMarker = "Output integrity guard:"
-	outputIntegrityGuardPrompt = outputIntegrityGuardMarker +
+	defaultOutputIntegrityGuardPrompt = outputIntegrityGuardMarker +
 		" If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, " +
 		"do not imitate or echo them; output only the correct content for the user."
 )
@@ -52,24 +68,31 @@ func MessagesPrepareWithThinking(messages []map[string]any, _ bool) string {
 		}
 		merged = append(merged, msg)
 	}
+	if !SentinelEnabled {
+		texts := make([]string, len(merged))
+		for i, m := range merged {
+			texts[i] = m.Text
+		}
+		return strings.Join(texts, "\n")
+	}
 	parts := make([]string, 0, len(merged)+2)
-	parts = append(parts, beginSentenceMarker)
+	parts = append(parts, SentinelBeginSentence)
 	lastRole := ""
 	for _, m := range merged {
 		lastRole = m.Role
 		switch m.Role {
 		case "assistant":
-			parts = append(parts, formatRoleBlock(assistantMarker, m.Text, endSentenceMarker))
+			parts = append(parts, formatRoleBlock(SentinelAssistant, m.Text, SentinelEndSentence))
 		case "tool":
 			if strings.TrimSpace(m.Text) != "" {
-				parts = append(parts, formatRoleBlock(toolMarker, m.Text, endToolResultsMarker))
+				parts = append(parts, formatRoleBlock(SentinelTool, m.Text, SentinelEndToolResults))
 			}
 		case "system":
 			if text := strings.TrimSpace(m.Text); text != "" {
-				parts = append(parts, formatRoleBlock(systemMarker, text, endInstructionsMarker))
+				parts = append(parts, formatRoleBlock(SentinelSystem, text, SentinelEndInstructions))
 			}
 		case "user":
-			parts = append(parts, formatRoleBlock(userMarker, m.Text, ""))
+			parts = append(parts, formatRoleBlock(SentinelUser, m.Text, ""))
 		default:
 			if strings.TrimSpace(m.Text) != "" {
 				parts = append(parts, m.Text)
@@ -77,13 +100,23 @@ func MessagesPrepareWithThinking(messages []map[string]any, _ bool) string {
 		}
 	}
 	if lastRole != "assistant" {
-		parts = append(parts, assistantMarker)
+		parts = append(parts, SentinelAssistant)
 	}
 	out := strings.Join(parts, "")
 	return markdownImagePattern.ReplaceAllString(out, `[${1}](${2})`)
 }
 
+func guardPromptText() string {
+	if strings.TrimSpace(OutputIntegrityGuardText) != "" {
+		return strings.TrimSpace(OutputIntegrityGuardText)
+	}
+	return defaultOutputIntegrityGuardPrompt
+}
+
 func prependOutputIntegrityGuard(messages []map[string]any) []map[string]any {
+	if !OutputIntegrityGuardEnabled {
+		return messages
+	}
 	if len(messages) == 0 {
 		return messages
 	}
@@ -93,7 +126,7 @@ func prependOutputIntegrityGuard(messages []map[string]any) []map[string]any {
 	out := make([]map[string]any, 0, len(messages)+1)
 	out = append(out, map[string]any{
 		"role":    "system",
-		"content": outputIntegrityGuardPrompt,
+		"content": guardPromptText(),
 	})
 	out = append(out, messages...)
 	return out

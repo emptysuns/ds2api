@@ -2,6 +2,14 @@ package toolcall
 
 import "strings"
 
+// ToolCallInstructionsEnabled controls whether tool call format instructions
+// are included in prompts. Default true.
+var ToolCallInstructionsEnabled = true
+
+// ToolCallInstructionsText allows overriding the default tool call instructions.
+// When empty, the default built-in instructions are used.
+var ToolCallInstructionsText = ""
+
 // BuildToolCallInstructions generates the unified tool-calling instruction block
 // used by all adapters (OpenAI, Claude, Gemini). It uses attention-optimized
 // structure: rules → negative examples → positive examples → anchor.
@@ -9,6 +17,12 @@ import "strings"
 // The toolNames slice should contain the actual tool names available in the
 // current request; the function picks real names for examples.
 func BuildToolCallInstructions(toolNames []string) string {
+	if !ToolCallInstructionsEnabled {
+		return ""
+	}
+	if strings.TrimSpace(ToolCallInstructionsText) != "" {
+		return strings.TrimSpace(ToolCallInstructionsText)
+	}
 	return `TOOL CALL FORMAT — FOLLOW EXACTLY:
 
 <|DSML|tool_calls>

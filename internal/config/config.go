@@ -20,6 +20,7 @@ type Config struct {
 	AutoDelete        AutoDeleteConfig        `json:"auto_delete"`
 	CurrentInputFile  CurrentInputFileConfig  `json:"current_input_file,omitempty"`
 	ThinkingInjection ThinkingInjectionConfig `json:"thinking_injection,omitempty"`
+	Prompt            PromptConfig            `json:"prompt,omitempty"`
 	Client            ClientConfig            `json:"client,omitempty"`
 	Vercel            VercelConfig            `json:"vercel,omitempty"`
 	VercelSyncHash    string                  `json:"_vercel_sync_hash,omitempty"`
@@ -179,6 +180,32 @@ type CurrentInputFileConfig struct {
 type ThinkingInjectionConfig struct {
 	Enabled *bool  `json:"enabled,omitempty"`
 	Prompt  string `json:"prompt,omitempty"`
+}
+
+type PromptConfig struct {
+	OutputIntegrityGuard     *bool              `json:"output_integrity_guard,omitempty"`
+	OutputIntegrityGuardText string             `json:"output_integrity_guard_text,omitempty"`
+	Sentinels                *SentinelConfig    `json:"sentinels,omitempty"`
+	ToolCallInstructions     *TextBlockConfig   `json:"tool_call_instructions,omitempty"`
+	ReadToolCacheGuard       *TextBlockConfig   `json:"read_tool_cache_guard,omitempty"`
+	EmptyOutputRetrySuffix   *TextBlockConfig   `json:"empty_output_retry_suffix,omitempty"`
+}
+
+type SentinelConfig struct {
+	Enabled         *bool  `json:"enabled,omitempty"`
+	BeginSentence   string `json:"begin_sentence,omitempty"`
+	System          string `json:"system,omitempty"`
+	User            string `json:"user,omitempty"`
+	Assistant       string `json:"assistant,omitempty"`
+	Tool            string `json:"tool,omitempty"`
+	EndSentence     string `json:"end_sentence,omitempty"`
+	EndToolResults  string `json:"end_tool_results,omitempty"`
+	EndInstructions string `json:"end_instructions,omitempty"`
+}
+
+type TextBlockConfig struct {
+	Enabled *bool  `json:"enabled,omitempty"`
+	Text    string `json:"text,omitempty"`
 }
 
 type ClientConfig struct {

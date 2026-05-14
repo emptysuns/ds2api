@@ -37,6 +37,16 @@ type ConfigStore interface {
 	CurrentInputFileMinChars() int
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
+	OutputIntegrityGuardEnabled() bool
+	OutputIntegrityGuardText() string
+	SentinelsEnabled() bool
+	SentinelOverrides() config.SentinelConfig
+	ToolCallInstructionsEnabled() bool
+	ToolCallInstructionsText() string
+	ReadToolCacheGuardEnabled() bool
+	ReadToolCacheGuardText() string
+	EmptyOutputRetrySuffixEnabled() bool
+	EmptyOutputRetrySuffixText() string
 	ClientConfigSnapshot() config.ClientConfig
 	AutoDeleteSessions() bool
 }

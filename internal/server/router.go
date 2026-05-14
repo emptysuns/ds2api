@@ -22,6 +22,9 @@ import (
 	dsclient "ds2api/internal/deepseek/client"
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/httpapi/admin"
+	"ds2api/internal/prompt"
+	"ds2api/internal/promptcompat"
+	"ds2api/internal/toolcall"
 	"ds2api/internal/httpapi/claude"
 	"ds2api/internal/httpapi/gemini"
 	"ds2api/internal/httpapi/ollama"
@@ -47,6 +50,7 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
+	applyPromptConfigFromStore(store)
 	applyClientConfigFromStore(store)
 	pool := account.NewPool(store)
 	var dsClient *dsclient.Client
@@ -406,6 +410,50 @@ func addVaryHeaderToken(h http.Header, token string) {
 		merged = append(merged, token)
 	}
 	h.Set("Vary", strings.Join(merged, ", "))
+}
+
+func applyPromptConfigFromStore(store *config.Store) {
+	if store == nil {
+		return
+	}
+	prompt.OutputIntegrityGuardEnabled = store.OutputIntegrityGuardEnabled()
+	prompt.OutputIntegrityGuardText = store.OutputIntegrityGuardText()
+
+	prompt.SentinelEnabled = store.SentinelsEnabled()
+	overrides := store.SentinelOverrides()
+	if overrides.BeginSentence != "" {
+		prompt.SentinelBeginSentence = overrides.BeginSentence
+	}
+	if overrides.System != "" {
+		prompt.SentinelSystem = overrides.System
+	}
+	if overrides.User != "" {
+		prompt.SentinelUser = overrides.User
+	}
+	if overrides.Assistant != "" {
+		prompt.SentinelAssistant = overrides.Assistant
+	}
+	if overrides.Tool != "" {
+		prompt.SentinelTool = overrides.Tool
+	}
+	if overrides.EndSentence != "" {
+		prompt.SentinelEndSentence = overrides.EndSentence
+	}
+	if overrides.EndToolResults != "" {
+		prompt.SentinelEndToolResults = overrides.EndToolResults
+	}
+	if overrides.EndInstructions != "" {
+		prompt.SentinelEndInstructions = overrides.EndInstructions
+	}
+
+	toolcall.ToolCallInstructionsEnabled = store.ToolCallInstructionsEnabled()
+	toolcall.ToolCallInstructionsText = store.ToolCallInstructionsText()
+
+	promptcompat.ReadToolCacheGuardEnabled = store.ReadToolCacheGuardEnabled()
+	promptcompat.ReadToolCacheGuardText = store.ReadToolCacheGuardText()
+
+	shared.EmptyOutputRetrySuffixEnabled = store.EmptyOutputRetrySuffixEnabled()
+	shared.EmptyOutputRetrySuffixText = store.EmptyOutputRetrySuffixText()
 }
 
 func applyClientConfigFromStore(store *config.Store) {

@@ -9,6 +9,10 @@ import (
 	authn "ds2api/internal/auth"
 	"ds2api/internal/config"
 	dsprotocol "ds2api/internal/deepseek/protocol"
+	"ds2api/internal/httpapi/openai/shared"
+	"ds2api/internal/prompt"
+	"ds2api/internal/promptcompat"
+	"ds2api/internal/toolcall"
 )
 
 func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +22,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, aliasMap, clientCfg, err := parseSettingsUpdateRequest(req)
+	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, promptCfg, aliasMap, clientCfg, err := parseSettingsUpdateRequest(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
@@ -33,6 +37,11 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	currentInputMinCharsSet := hasNestedSettingsKey(req, "current_input_file", "min_chars")
 	thinkingInjectionEnabledSet := hasNestedSettingsKey(req, "thinking_injection", "enabled")
 	thinkingInjectionPromptSet := hasNestedSettingsKey(req, "thinking_injection", "prompt")
+	promptOutputIntegrityGuardSet := hasNestedSettingsKey(req, "prompt", "output_integrity_guard")
+	promptSentinelsSet := hasNestedSettingsKey(req, "prompt", "sentinels")
+	promptToolInstrSet := hasNestedSettingsKey(req, "prompt", "tool_call_instructions")
+	promptReadCacheSet := hasNestedSettingsKey(req, "prompt", "read_tool_cache_guard")
+	promptEmptyRetrySet := hasNestedSettingsKey(req, "prompt", "empty_output_retry_suffix")
 
 	if err := h.Store.Update(func(c *config.Config) error {
 		if adminCfg != nil {
@@ -80,6 +89,23 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 				c.ThinkingInjection.Prompt = thinkingInjCfg.Prompt
 			}
 		}
+		if promptCfg != nil {
+			if promptOutputIntegrityGuardSet {
+				c.Prompt.OutputIntegrityGuard = promptCfg.OutputIntegrityGuard
+			}
+			if promptSentinelsSet {
+				c.Prompt.Sentinels = promptCfg.Sentinels
+			}
+			if promptToolInstrSet {
+				c.Prompt.ToolCallInstructions = promptCfg.ToolCallInstructions
+			}
+			if promptReadCacheSet {
+				c.Prompt.ReadToolCacheGuard = promptCfg.ReadToolCacheGuard
+			}
+			if promptEmptyRetrySet {
+				c.Prompt.EmptyOutputRetrySuffix = promptCfg.EmptyOutputRetrySuffix
+			}
+		}
 		if aliasMap != nil {
 			c.ModelAliases = aliasMap
 		}
@@ -110,6 +136,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.applyClientConfig()
+	h.applyPromptConfig()
 	h.applyRuntimeSettings()
 	needsSync := config.IsVercel() || h.Store.IsEnvBacked()
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -168,6 +195,50 @@ func (h *Handler) applyClientConfig() {
 		Locale:          cfg.Locale,
 		BaseHeaders:     cfg.BaseHeaders,
 	})
+}
+
+func (h *Handler) applyPromptConfig() {
+	if h == nil || h.Store == nil {
+		return
+	}
+	prompt.OutputIntegrityGuardEnabled = h.Store.OutputIntegrityGuardEnabled()
+	prompt.OutputIntegrityGuardText = h.Store.OutputIntegrityGuardText()
+
+	prompt.SentinelEnabled = h.Store.SentinelsEnabled()
+	overrides := h.Store.SentinelOverrides()
+	if overrides.BeginSentence != "" {
+		prompt.SentinelBeginSentence = overrides.BeginSentence
+	}
+	if overrides.System != "" {
+		prompt.SentinelSystem = overrides.System
+	}
+	if overrides.User != "" {
+		prompt.SentinelUser = overrides.User
+	}
+	if overrides.Assistant != "" {
+		prompt.SentinelAssistant = overrides.Assistant
+	}
+	if overrides.Tool != "" {
+		prompt.SentinelTool = overrides.Tool
+	}
+	if overrides.EndSentence != "" {
+		prompt.SentinelEndSentence = overrides.EndSentence
+	}
+	if overrides.EndToolResults != "" {
+		prompt.SentinelEndToolResults = overrides.EndToolResults
+	}
+	if overrides.EndInstructions != "" {
+		prompt.SentinelEndInstructions = overrides.EndInstructions
+	}
+
+	toolcall.ToolCallInstructionsEnabled = h.Store.ToolCallInstructionsEnabled()
+	toolcall.ToolCallInstructionsText = h.Store.ToolCallInstructionsText()
+
+	promptcompat.ReadToolCacheGuardEnabled = h.Store.ReadToolCacheGuardEnabled()
+	promptcompat.ReadToolCacheGuardText = h.Store.ReadToolCacheGuardText()
+
+	shared.EmptyOutputRetrySuffixEnabled = h.Store.EmptyOutputRetrySuffixEnabled()
+	shared.EmptyOutputRetrySuffixText = h.Store.EmptyOutputRetrySuffixText()
 }
 
 func hasNestedSettingsKey(req map[string]any, section, key string) bool {

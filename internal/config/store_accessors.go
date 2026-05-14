@@ -160,6 +160,93 @@ func (s *Store) CurrentInputFileMinChars() int {
 	return s.cfg.CurrentInputFile.MinChars
 }
 
+func (s *Store) OutputIntegrityGuardEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.OutputIntegrityGuard == nil {
+		return true
+	}
+	return *s.cfg.Prompt.OutputIntegrityGuard
+}
+
+func (s *Store) OutputIntegrityGuardText() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return strings.TrimSpace(s.cfg.Prompt.OutputIntegrityGuardText)
+}
+
+func (s *Store) SentinelsEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.Sentinels == nil || s.cfg.Prompt.Sentinels.Enabled == nil {
+		return true
+	}
+	return *s.cfg.Prompt.Sentinels.Enabled
+}
+
+func (s *Store) SentinelOverrides() SentinelConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.Sentinels == nil {
+		return SentinelConfig{}
+	}
+	return *s.cfg.Prompt.Sentinels
+}
+
+func (s *Store) ToolCallInstructionsEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.ToolCallInstructions == nil || s.cfg.Prompt.ToolCallInstructions.Enabled == nil {
+		return true
+	}
+	return *s.cfg.Prompt.ToolCallInstructions.Enabled
+}
+
+func (s *Store) ToolCallInstructionsText() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.ToolCallInstructions == nil {
+		return ""
+	}
+	return strings.TrimSpace(s.cfg.Prompt.ToolCallInstructions.Text)
+}
+
+func (s *Store) ReadToolCacheGuardEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.ReadToolCacheGuard == nil || s.cfg.Prompt.ReadToolCacheGuard.Enabled == nil {
+		return true
+	}
+	return *s.cfg.Prompt.ReadToolCacheGuard.Enabled
+}
+
+func (s *Store) ReadToolCacheGuardText() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.ReadToolCacheGuard == nil {
+		return ""
+	}
+	return strings.TrimSpace(s.cfg.Prompt.ReadToolCacheGuard.Text)
+}
+
+func (s *Store) EmptyOutputRetrySuffixEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.EmptyOutputRetrySuffix == nil || s.cfg.Prompt.EmptyOutputRetrySuffix.Enabled == nil {
+		return true
+	}
+	return *s.cfg.Prompt.EmptyOutputRetrySuffix.Enabled
+}
+
+func (s *Store) EmptyOutputRetrySuffixText() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Prompt.EmptyOutputRetrySuffix == nil {
+		return ""
+	}
+	return strings.TrimSpace(s.cfg.Prompt.EmptyOutputRetrySuffix.Text)
+}
+
 func (s *Store) ThinkingInjectionEnabled() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"ds2api/internal/config"
 	"context"
 	"fmt"
 	"io"
@@ -47,6 +48,17 @@ func (m mockOpenAIConfig) ThinkingInjectionEnabled() bool {
 	return *m.thinkingInjection
 }
 func (m mockOpenAIConfig) ThinkingInjectionPrompt() string { return m.thinkingPrompt }
+func (m mockOpenAIConfig) OutputIntegrityGuardEnabled() bool { return true }
+func (m mockOpenAIConfig) OutputIntegrityGuardText() string    { return "" }
+func (m mockOpenAIConfig) SentinelsEnabled() bool              { return true }
+func (m mockOpenAIConfig) SentinelOverrides() config.SentinelConfig { return config.SentinelConfig{} }
+func (m mockOpenAIConfig) ToolCallInstructionsEnabled() bool   { return true }
+func (m mockOpenAIConfig) ToolCallInstructionsText() string    { return "" }
+func (m mockOpenAIConfig) ReadToolCacheGuardEnabled() bool     { return true }
+func (m mockOpenAIConfig) ReadToolCacheGuardText() string      { return "" }
+func (m mockOpenAIConfig) EmptyOutputRetrySuffixEnabled() bool { return true }
+func (m mockOpenAIConfig) EmptyOutputRetrySuffixText() string  { return "" }
+
 
 type streamStatusAuthStub struct{}
 

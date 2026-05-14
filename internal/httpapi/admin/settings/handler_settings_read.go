@@ -39,6 +39,23 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"prompt":         h.Store.ThinkingInjectionPrompt(),
 			"default_prompt": promptcompat.DefaultThinkingInjectionPrompt,
 		},
+		"prompt": map[string]any{
+			"output_integrity_guard":      h.Store.OutputIntegrityGuardEnabled(),
+			"output_integrity_guard_text": h.Store.OutputIntegrityGuardText(),
+			"sentinels":                   sentinelSettingsMap(snap.Prompt.Sentinels, h.Store.SentinelsEnabled()),
+			"tool_call_instructions": map[string]any{
+				"enabled": h.Store.ToolCallInstructionsEnabled(),
+				"text":    h.Store.ToolCallInstructionsText(),
+			},
+			"read_tool_cache_guard": map[string]any{
+				"enabled": h.Store.ReadToolCacheGuardEnabled(),
+				"text":    h.Store.ReadToolCacheGuardText(),
+			},
+			"empty_output_retry_suffix": map[string]any{
+				"enabled": h.Store.EmptyOutputRetrySuffixEnabled(),
+				"text":    h.Store.EmptyOutputRetrySuffixText(),
+			},
+		},
 		"model_aliases": snap.ModelAliases,
 		"client": map[string]any{
 			"name":              snap.Client.Name,
@@ -51,6 +68,25 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 		"env_backed": h.Store.IsEnvBacked(),
 		"needs_vercel_sync": needsSync,
 	})
+}
+
+func sentinelSettingsMap(sc *config.SentinelConfig, enabled bool) map[string]any {
+	m := map[string]any{"enabled": enabled}
+	if sc != nil {
+		m["begin_sentence"] = sc.BeginSentence
+		m["system"] = sc.System
+		m["user"] = sc.User
+		m["assistant"] = sc.Assistant
+		m["tool"] = sc.Tool
+		m["end_sentence"] = sc.EndSentence
+		m["end_tool_results"] = sc.EndToolResults
+		m["end_instructions"] = sc.EndInstructions
+	} else {
+		for _, k := range []string{"begin_sentence", "system", "user", "assistant", "tool", "end_sentence", "end_tool_results", "end_instructions"} {
+			m[k] = ""
+		}
+	}
+	return m
 }
 
 func baseHeadersMap(m map[string]string) map[string]string {

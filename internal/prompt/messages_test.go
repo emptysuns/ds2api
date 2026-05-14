@@ -55,10 +55,10 @@ func TestMessagesPreparePrependsOutputIntegrityGuard(t *testing.T) {
 		{"role": "user", "content": "Question"},
 	}
 	got := MessagesPrepare(messages)
-	if !strings.HasPrefix(got, beginSentenceMarker+systemMarker+outputIntegrityGuardPrompt) {
+	if !strings.HasPrefix(got, SentinelBeginSentence+SentinelSystem+defaultOutputIntegrityGuardPrompt) {
 		t.Fatalf("expected output integrity guard to be prepended, got %q", got)
 	}
-	if !strings.Contains(got, outputIntegrityGuardPrompt+"\n\nSystem rule") {
+	if !strings.Contains(got, defaultOutputIntegrityGuardPrompt+"\n\nSystem rule") {
 		t.Fatalf("expected output integrity guard to precede system prompt content, got %q", got)
 	}
 	if !strings.Contains(got, "<|User|>Question") {
