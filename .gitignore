@@ -59,6 +59,7 @@ Thumbs.db
 
 # Claude Code
 .claude/
+.worktrees/
 CLAUDE.local.md
 
 # Local tool bootstrap cache
