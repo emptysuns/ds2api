@@ -109,7 +109,7 @@ function fromServerForm(data) {
             tool_call_instructions: {
                 enabled: data.prompt?.tool_call_instructions?.enabled ?? true,
                 text: data.prompt?.tool_call_instructions?.text || '',
-                default_text: '',
+                default_text: data.prompt?.tool_call_instructions?.default_text || '',
             },
             read_tool_cache_guard: {
                 enabled: data.prompt?.read_tool_cache_guard?.enabled ?? true,

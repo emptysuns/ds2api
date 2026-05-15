@@ -7,6 +7,7 @@ import (
 	authn "ds2api/internal/auth"
 	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/toolcall"
 )
 
 func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
@@ -44,8 +45,9 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"output_integrity_guard_text": h.Store.OutputIntegrityGuardText(),
 			"sentinels":                   sentinelSettingsMap(snap.Prompt.Sentinels, h.Store.SentinelsEnabled()),
 			"tool_call_instructions": map[string]any{
-				"enabled": h.Store.ToolCallInstructionsEnabled(),
-				"text":    h.Store.ToolCallInstructionsText(),
+				"enabled":      h.Store.ToolCallInstructionsEnabled(),
+				"text":         h.Store.ToolCallInstructionsText(),
+				"default_text": toolcall.DefaultToolCallInstructionsTemplate(),
 			},
 			"read_tool_cache_guard": map[string]any{
 				"enabled": h.Store.ReadToolCacheGuardEnabled(),
@@ -65,7 +67,7 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"locale":            snap.Client.Locale,
 			"base_headers":      baseHeadersMap(snap.Client.BaseHeaders),
 		},
-		"env_backed": h.Store.IsEnvBacked(),
+		"env_backed":        h.Store.IsEnvBacked(),
 		"needs_vercel_sync": needsSync,
 	})
 }

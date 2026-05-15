@@ -16,6 +16,10 @@ var ToolCallInstructionsText = ""
 //
 // The toolNames slice should contain the actual tool names available in the
 // current request; the function picks real names for examples.
+func DefaultToolCallInstructionsTemplate() string {
+	return defaultToolCallInstructions([]string{"Bash", "Edit"})
+}
+
 func BuildToolCallInstructions(toolNames []string) string {
 	if !ToolCallInstructionsEnabled {
 		return ""
@@ -23,6 +27,10 @@ func BuildToolCallInstructions(toolNames []string) string {
 	if strings.TrimSpace(ToolCallInstructionsText) != "" {
 		return strings.TrimSpace(ToolCallInstructionsText)
 	}
+	return defaultToolCallInstructions(toolNames)
+}
+
+func defaultToolCallInstructions(toolNames []string) string {
 	return `TOOL CALL FORMAT — FOLLOW EXACTLY:
 
 <|DSML|tool_calls>
