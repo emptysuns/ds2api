@@ -54,6 +54,8 @@ type ConfigReader interface {
 	ReadToolCacheGuardText() string
 	EmptyOutputRetrySuffixEnabled() bool
 	EmptyOutputRetrySuffixText() string
+	ResponseReplacementsEnabled() bool
+	ResponseReplacementRules() []config.ResponseReplacementRule
 }
 
 type Deps struct {

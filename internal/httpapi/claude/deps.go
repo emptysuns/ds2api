@@ -25,6 +25,8 @@ type ConfigReader interface {
 	ModelAliases() map[string]string
 	CurrentInputFileEnabled() bool
 	CurrentInputFileMinChars() int
+	ResponseReplacementsEnabled() bool
+	ResponseReplacementRules() []config.ResponseReplacementRule
 }
 
 type OpenAIChatRunner interface {

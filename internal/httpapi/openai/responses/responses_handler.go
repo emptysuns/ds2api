@@ -106,7 +106,8 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	if !stdReq.Stream {
 		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
 			RetryEnabled:     true,
-			CurrentInputFile: h.Store,
+			CurrentInputFile:      h.Store,
+				ResponseReplacements:  h.responseReplacementRules(),
 		})
 		if outErr != nil {
 			if historySession != nil {
@@ -214,6 +215,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 			h.getResponseStore().put(owner, responseID, obj)
 		},
 		nil,
+		nil, // responseReplacer
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	streamRuntime.sendCreated()

@@ -9,6 +9,7 @@ import (
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolstream"
@@ -42,6 +43,7 @@ type chatStreamRuntime struct {
 	streamToolCallIDs map[int]string
 	streamToolNames   map[int]string
 	accumulator       shared.StreamAccumulator
+	responseReplacer  *responserewrite.StreamReplacer
 	responseMessageID int
 
 	finalThinking     string
@@ -95,6 +97,7 @@ func newChatStreamRuntime(
 	toolChoice promptcompat.ToolChoicePolicy,
 	bufferToolContent bool,
 	emitEarlyToolDeltas bool,
+	responseReplacer *responserewrite.StreamReplacer,
 ) *chatStreamRuntime {
 	return &chatStreamRuntime{
 		w:                     w,
@@ -114,10 +117,12 @@ func newChatStreamRuntime(
 		emitEarlyToolDeltas:   emitEarlyToolDeltas,
 		streamToolCallIDs:     map[int]string{},
 		streamToolNames:       map[int]string{},
+		responseReplacer:      responseReplacer,
 		accumulator: shared.StreamAccumulator{
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
+			ResponseReplacer:      responseReplacer,
 		},
 	}
 }
@@ -216,6 +221,13 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 	s.finalErrorStatus = 0
 	s.finalErrorMessage = ""
 	s.finalErrorCode = ""
+	// Flush any pending response replacements before building the turn.
+	if s.responseReplacer != nil {
+		flushDelta := s.accumulator.FlushResponseReplacements()
+		if flushDelta.VisibleText != "" && !s.bufferToolContent {
+			s.sendDelta(map[string]any{"content": flushDelta.VisibleText})
+		}
+	}
 	finalThinking := s.accumulator.Thinking.String()
 	finalToolDetectionThinking := s.accumulator.ToolDetectionThinking.String()
 	finalText := s.accumulator.Text.String()

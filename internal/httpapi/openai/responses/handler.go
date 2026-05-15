@@ -7,6 +7,7 @@ import (
 
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
+	"ds2api/internal/config"
 	"ds2api/internal/httpapi/openai/files"
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/openai/shared"
@@ -105,4 +106,16 @@ func emptyOutputRetryMaxAttempts() int {
 
 func filterIncrementalToolCallDeltasByAllowed(deltas []toolstream.ToolCallDelta, seenNames map[int]string) []toolstream.ToolCallDelta {
 	return shared.FilterIncrementalToolCallDeltasByAllowed(deltas, seenNames)
+}
+
+// responseReplacementRules returns the configured response replacement rules
+// if enabled, or nil if disabled or no rules are configured.
+func (h *Handler) responseReplacementRules() []config.ResponseReplacementRule {
+	if h == nil || h.Store == nil {
+		return nil
+	}
+	if !h.Store.ResponseReplacementsEnabled() {
+		return nil
+	}
+	return h.Store.ResponseReplacementRules()
 }

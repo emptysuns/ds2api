@@ -55,6 +55,9 @@ func (m mockOpenAIConfig) ReadToolCacheGuardText() string      { return "" }
 func (m mockOpenAIConfig) EmptyOutputRetrySuffixEnabled() bool { return true }
 func (m mockOpenAIConfig) EmptyOutputRetrySuffixText() string  { return "" }
 
+func (m mockOpenAIConfig) ResponseReplacementsEnabled() bool { return false }
+func (m mockOpenAIConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
+
 
 func TestNormalizeOpenAIChatRequestWithConfigInterface(t *testing.T) {
 	cfg := mockOpenAIConfig{

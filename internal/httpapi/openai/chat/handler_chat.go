@@ -15,6 +15,7 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 )
@@ -84,8 +85,9 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	if !stdReq.Stream {
 		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-			RetryEnabled:     true,
-			CurrentInputFile: h.Store,
+			RetryEnabled:          true,
+			CurrentInputFile:      h.Store,
+			ResponseReplacements:  h.responseReplacementRules(),
 		})
 		sessionID = result.SessionID
 		if outErr != nil {
@@ -164,7 +166,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, resp *http.Response, co
 		writeOpenAIError(w, resp.StatusCode, string(body))
 		return
 	}
-	result := sse.CollectStream(resp, thinkingEnabled, true)
+	result := sse.CollectStreamWithReplacements(resp, thinkingEnabled, true, h.responseReplacementRules())
 
 	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
 		Model:         model,
@@ -237,6 +239,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		promptcompat.DefaultToolChoicePolicy(),
 		bufferToolContent,
 		emitEarlyToolDeltas,
+		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 

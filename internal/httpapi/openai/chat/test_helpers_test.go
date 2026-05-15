@@ -58,6 +58,8 @@ func (m mockOpenAIConfig) ReadToolCacheGuardEnabled() bool     { return true }
 func (m mockOpenAIConfig) ReadToolCacheGuardText() string      { return "" }
 func (m mockOpenAIConfig) EmptyOutputRetrySuffixEnabled() bool { return true }
 func (m mockOpenAIConfig) EmptyOutputRetrySuffixText() string  { return "" }
+func (m mockOpenAIConfig) ResponseReplacementsEnabled() bool                { return false }
+func (m mockOpenAIConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 
 
 type streamStatusAuthStub struct{}
@@ -122,6 +124,9 @@ func (m streamStatusDSStub) DeleteSessionForToken(_ context.Context, _ string, _
 func (m streamStatusDSStub) DeleteAllSessionsForToken(_ context.Context, _ string) error {
 	return nil
 }
+
+func (m streamStatusDSStub) ResponseReplacementsEnabled() bool { return false }
+func (m streamStatusDSStub) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 
 func makeOpenAISSEHTTPResponse(lines ...string) *http.Response {
 	body := strings.Join(lines, "\n")

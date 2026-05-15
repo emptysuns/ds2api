@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"ds2api/internal/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,9 @@ type claudeHistoryConfig struct {
 }
 
 func (m claudeHistoryConfig) ModelAliases() map[string]string { return m.aliases }
+
+func (m claudeHistoryConfig) ResponseReplacementsEnabled() bool { return false }
+func (m claudeHistoryConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 func (claudeHistoryConfig) CurrentInputFileEnabled() bool     { return false }
 func (claudeHistoryConfig) CurrentInputFileMinChars() int     { return 0 }
 

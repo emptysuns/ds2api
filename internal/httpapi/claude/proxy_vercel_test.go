@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"ds2api/internal/config"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,9 @@ func (s claudeProxyStoreStub) ModelAliases() map[string]string { return s.aliase
 
 func (claudeProxyStoreStub) CurrentInputFileEnabled() bool { return true }
 func (claudeProxyStoreStub) CurrentInputFileMinChars() int { return 0 }
+func (m claudeProxyStoreStub) ResponseReplacementsEnabled() bool { return false }
+func (m claudeProxyStoreStub) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
+
 
 type openAIProxyStub struct {
 	status int

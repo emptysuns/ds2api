@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"ds2api/internal/config"
 	dsprotocol "ds2api/internal/deepseek/protocol"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/util"
 )
 
@@ -26,6 +28,13 @@ type CollectResult struct {
 //
 // The caller is responsible for closing resp.Body unless closeBody is true.
 func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) CollectResult {
+	return CollectStreamWithReplacements(resp, thinkingEnabled, closeBody, nil)
+}
+
+// CollectStreamWithReplacements is like CollectStream but applies
+// response-replacement rules to each text/thinking chunk before accumulating.
+// Pass nil or an empty slice for replacements to skip rewriting.
+func CollectStreamWithReplacements(resp *http.Response, thinkingEnabled bool, closeBody bool, replacements []config.ResponseReplacementRule) CollectResult {
 	if closeBody {
 		defer func() { _ = resp.Body.Close() }()
 	}
@@ -70,14 +79,17 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 		for _, p := range result.Parts {
 			if p.Type == "thinking" {
 				trimmed := TrimContinuationOverlap(thinking.String(), p.Text)
+				trimmed = responserewrite.Apply(trimmed, replacements)
 				thinking.WriteString(trimmed)
 			} else {
 				trimmed := TrimContinuationOverlap(text.String(), p.Text)
+				trimmed = responserewrite.Apply(trimmed, replacements)
 				text.WriteString(trimmed)
 			}
 		}
 		for _, p := range result.ToolDetectionThinkingParts {
 			trimmed := TrimContinuationOverlap(toolDetectionThinking.String(), p.Text)
+			trimmed = responserewrite.Apply(trimmed, replacements)
 			toolDetectionThinking.WriteString(trimmed)
 		}
 		return true

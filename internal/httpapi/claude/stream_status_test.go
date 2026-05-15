@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"ds2api/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,6 +26,9 @@ func (streamStatusClaudeStoreStub) ModelAliases() map[string]string { return nil
 
 func (streamStatusClaudeStoreStub) CurrentInputFileEnabled() bool { return true }
 func (streamStatusClaudeStoreStub) CurrentInputFileMinChars() int { return 0 }
+func (m streamStatusClaudeStoreStub) ResponseReplacementsEnabled() bool { return false }
+func (m streamStatusClaudeStoreStub) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
+
 
 func captureClaudeStatusMiddleware(statuses *[]int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

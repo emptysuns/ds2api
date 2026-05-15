@@ -15,6 +15,7 @@ import (
 
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
+	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/promptcompat"
 )
@@ -24,6 +25,8 @@ type testGeminiConfig struct{}
 func (testGeminiConfig) ModelAliases() map[string]string { return nil }
 func (testGeminiConfig) CurrentInputFileEnabled() bool   { return true }
 func (testGeminiConfig) CurrentInputFileMinChars() int   { return 0 }
+func (testGeminiConfig) ResponseReplacementsEnabled() bool                    { return false }
+func (testGeminiConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 
 type testGeminiAuth struct {
 	a   *auth.RequestAuth
@@ -44,6 +47,9 @@ func (m testGeminiAuth) Determine(_ *http.Request) (*auth.RequestAuth, error) {
 		TriedAccounts:  map[string]bool{},
 	}, nil
 }
+
+func (m testGeminiAuth) ResponseReplacementsEnabled() bool { return false }
+func (m testGeminiAuth) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 
 func (testGeminiAuth) Release(_ *auth.RequestAuth) {}
 

@@ -17,6 +17,7 @@ import (
 	"ds2api/internal/completionruntime"
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/requestbody"
+	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
 	"ds2api/internal/sse"
@@ -97,8 +98,9 @@ func (h *Handler) handleGeminiDirect(w http.ResponseWriter, r *http.Request, str
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		RetryEnabled:     true,
-		CurrentInputFile: h.Store,
+		RetryEnabled:          true,
+		CurrentInputFile:      h.Store,
+		ResponseReplacements:  h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {
@@ -460,4 +462,16 @@ func buildGeminiPartsFromFinal(finalText, finalThinking string, toolNames []stri
 		parts = append(parts, map[string]any{"text": ""})
 	}
 	return parts
+}
+
+// responseReplacementRules returns the configured response replacement rules
+// if enabled, or nil if disabled or no rules are configured.
+func (h *Handler) responseReplacementRules() []config.ResponseReplacementRule {
+	if h == nil || h.Store == nil {
+		return nil
+	}
+	if !h.Store.ResponseReplacementsEnabled() {
+		return nil
+	}
+	return h.Store.ResponseReplacementRules()
 }
