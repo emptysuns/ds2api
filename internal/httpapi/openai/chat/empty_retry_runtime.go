@@ -13,6 +13,7 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 )
@@ -137,6 +138,7 @@ func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Res
 		thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw,
 		toolChoice,
 		len(toolNames) > 0, h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
+		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	return streamRuntime, initialType, true

@@ -29,6 +29,10 @@ const DEFAULT_FORM = {
         read_tool_cache_guard: { enabled: true, text: '', default_text: '' },
         empty_output_retry_suffix: { enabled: true, text: '', default_text: '' },
     },
+    response_replacements: {
+        enabled: false,
+        rules: [],
+    },
     client: { name: '', platform: '', version: '', android_api_level: '', locale: '', base_headers_text: '{}' },
     model_aliases_text: '{}',
 }
@@ -109,7 +113,7 @@ function fromServerForm(data) {
             tool_call_instructions: {
                 enabled: data.prompt?.tool_call_instructions?.enabled ?? true,
                 text: data.prompt?.tool_call_instructions?.text || '',
-                default_text: '',
+                default_text: data.prompt?.tool_call_instructions?.default_text || '',
             },
             read_tool_cache_guard: {
                 enabled: data.prompt?.read_tool_cache_guard?.enabled ?? true,
@@ -121,6 +125,12 @@ function fromServerForm(data) {
                 text: data.prompt?.empty_output_retry_suffix?.text || '',
                 default_text: 'Previous reply had no visible output. Please regenerate the visible final answer or tool call now.',
             },
+        },
+        response_replacements: {
+            enabled: Boolean(data.response_replacements?.enabled),
+            rules: Array.isArray(data.response_replacements?.rules)
+                ? data.response_replacements.rules.map((r) => ({ from: r.from || '', to: r.to || '' }))
+                : [],
         },
         client: {
             name: data.client?.name || '',
@@ -181,6 +191,12 @@ function toServerPayload(form, baseHeaders) {
                 enabled: Boolean(form.prompt?.empty_output_retry_suffix?.enabled ?? true),
                 text: String(form.prompt?.empty_output_retry_suffix?.text || '').trim(),
             },
+        },
+        response_replacements: {
+            enabled: Boolean(form.response_replacements?.enabled),
+            rules: (form.response_replacements?.rules || [])
+                .map((r) => ({ from: String(r.from || '').trim(), to: String(r.to || '') }))
+                .filter((r) => r.from),
         },
         client: {
             name: String(form.client?.name || '').trim(),

@@ -30,6 +30,7 @@ type Options struct {
 	RetryEnabled          bool
 	RetryMaxAttempts      int
 	CurrentInputFile      history.CurrentInputConfigReader
+	ResponseReplacements  []config.ResponseReplacementRule
 }
 
 type NonStreamResult struct {
@@ -253,7 +254,7 @@ func collectAttempt(resp *http.Response, stdReq promptcompat.StandardRequest, us
 		}
 		return assistantturn.Turn{}, &assistantturn.OutputError{Status: resp.StatusCode, Message: message, Code: "error"}
 	}
-	result := sse.CollectStream(resp, stdReq.Thinking, false)
+	result := sse.CollectStreamWithReplacements(resp, stdReq.Thinking, false, opts.ResponseReplacements)
 	return assistantturn.BuildTurnFromCollected(result, buildOptions(stdReq, usagePrompt, opts)), nil
 }
 

@@ -10,11 +10,10 @@ type Rule = config.ResponseReplacementRule
 
 func Apply(text string, rules []Rule) string {
 	for _, rule := range rules {
-		from := strings.TrimSpace(rule.From)
-		if from == "" {
+		if strings.TrimSpace(rule.From) == "" {
 			continue
 		}
-		text = strings.ReplaceAll(text, from, rule.To)
+		text = strings.ReplaceAll(text, rule.From, rule.To)
 	}
 	return text
 }
@@ -29,12 +28,11 @@ func NewStreamReplacer(rules []Rule) *StreamReplacer {
 	clean := make([]Rule, 0, len(rules))
 	keep := 0
 	for _, rule := range rules {
-		from := strings.TrimSpace(rule.From)
-		if from == "" {
+		if strings.TrimSpace(rule.From) == "" {
 			continue
 		}
-		clean = append(clean, Rule{From: from, To: rule.To})
-		if n := len(from) - 1; n > keep {
+		clean = append(clean, rule)
+		if n := len(rule.From); n > keep {
 			keep = n
 		}
 	}

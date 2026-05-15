@@ -112,6 +112,43 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 		}
 	}
 
+	// Flush any pending response replacements before building the turn.
+	if s.responseReplacer != nil {
+		flushed := s.responseReplacer.Flush()
+		if flushed != "" {
+			s.rawText.WriteString(flushed)
+			cleaned := cleanVisibleOutput(flushed, s.stripReferenceMarkers)
+			if cleaned != "" && (!s.searchEnabled || !sse.IsCitation(cleaned)) {
+				s.text.WriteString(cleaned)
+				if !s.bufferToolContent {
+					s.closeThinkingBlock()
+					if !s.textBlockOpen {
+						s.textBlockIndex = s.nextBlockIndex
+						s.nextBlockIndex++
+						s.send("content_block_start", map[string]any{
+							"type":  "content_block_start",
+							"index": s.textBlockIndex,
+							"content_block": map[string]any{
+								"type": "text",
+								"text": "",
+							},
+						})
+						s.textBlockOpen = true
+					}
+					s.send("content_block_delta", map[string]any{
+						"type":  "content_block_delta",
+						"index": s.textBlockIndex,
+						"delta": map[string]any{
+							"type": "text_delta",
+							"text": cleaned,
+						},
+					})
+					s.textEmitted = true
+				}
+			}
+		}
+	}
+
 	s.closeTextBlock()
 
 	turn := assistantturn.BuildTurnFromStreamSnapshot(assistantturn.StreamSnapshot{

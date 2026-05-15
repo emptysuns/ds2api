@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	authn "ds2api/internal/auth"
@@ -73,6 +74,26 @@ func TestGetSettingsIncludesCurrentInputFileDefaults(t *testing.T) {
 	}
 	if got, _ := thinkingInjection["default_prompt"].(string); got == "" {
 		t.Fatalf("expected default thinking prompt, body=%v", body)
+	}
+}
+
+func TestGetSettingsReturnsToolCallInstructionsDefaultText(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"]}`)
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	rec := httptest.NewRecorder()
+	h.getSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	promptBody, _ := body["prompt"].(map[string]any)
+	toolBody, _ := promptBody["tool_call_instructions"].(map[string]any)
+	defaultText, _ := toolBody["default_text"].(string)
+	if !strings.Contains(defaultText, "TOOL CALL FORMAT — FOLLOW EXACTLY:") || !strings.Contains(defaultText, "【CORRECT EXAMPLES】:") {
+		t.Fatalf("unexpected default tool instruction text: %q", defaultText)
 	}
 }
 

@@ -230,6 +230,74 @@ export default function PromptSection({ t, form, setForm }) {
                     visible={Boolean(p.empty_output_retry_suffix?.enabled ?? true)}
                 />
             </div>
+
+            {/* Response Replacements */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ToggleRow
+                    t={t}
+                    label={t('settings.responseReplacementsEnabled')}
+                    desc={t('settings.responseReplacementsDesc')}
+                    checked={Boolean(form.response_replacements?.enabled)}
+                    onChange={(v) => setForm((prev) => ({
+                        ...prev,
+                        response_replacements: { ...prev.response_replacements, enabled: v },
+                    }))}
+                />
+                {Boolean(form.response_replacements?.enabled) && (
+                    <div className="md:col-span-2 space-y-2">
+                        {(form.response_replacements?.rules || []).map((rule, idx) => (
+                            <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                                <TextInput
+                                    label={t('settings.responseReplacementFrom')}
+                                    value={rule.from || ''}
+                                    placeholder="<|DEML"
+                                    onChange={(v) => setForm((prev) => {
+                                        const rules = [...(prev.response_replacements?.rules || [])]
+                                        rules[idx] = { ...rules[idx], from: v }
+                                        return { ...prev, response_replacements: { ...prev.response_replacements, rules } }
+                                    })}
+                                />
+                                <TextInput
+                                    label={t('settings.responseReplacementTo')}
+                                    value={rule.to || ''}
+                                    placeholder="<|DSML"
+                                    onChange={(v) => setForm((prev) => {
+                                        const rules = [...(prev.response_replacements?.rules || [])]
+                                        rules[idx] = { ...rules[idx], to: v }
+                                        return { ...prev, response_replacements: { ...prev.response_replacements, rules } }
+                                    })}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setForm((prev) => ({
+                                        ...prev,
+                                        response_replacements: {
+                                            ...prev.response_replacements,
+                                            rules: (prev.response_replacements?.rules || []).filter((_, i) => i !== idx),
+                                        },
+                                    }))}
+                                    className="px-3 py-2 rounded-lg border border-border text-xs hover:bg-muted"
+                                >
+                                    {t('settings.responseReplacementRemove')}
+                                </button>
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() => setForm((prev) => ({
+                                ...prev,
+                                response_replacements: {
+                                    ...prev.response_replacements,
+                                    rules: [...(prev.response_replacements?.rules || []), { from: '', to: '' }],
+                                },
+                            }))}
+                            className="px-3 py-2 rounded-lg border border-border text-xs hover:bg-muted"
+                        >
+                            {t('settings.responseReplacementAdd')}
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

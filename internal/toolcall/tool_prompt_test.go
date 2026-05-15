@@ -146,6 +146,23 @@ func TestBuildToolCallInstructions_UsesPositiveTagPunctuationAlphabet(t *testing
 	}
 }
 
+func TestDefaultToolCallInstructionsTemplateContainsRulesAndExamples(t *testing.T) {
+	out := DefaultToolCallInstructionsTemplate()
+	for _, want := range []string{
+		"TOOL CALL FORMAT — FOLLOW EXACTLY:",
+		"RULES:",
+		"PARAMETER SHAPES:",
+		"【WRONG — Do NOT do these】:",
+		"【CORRECT EXAMPLES】:",
+		`<|DSML|invoke name="Bash">`,
+		`<|DSML|invoke name="Edit">`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("default template missing %q in:\n%s", want, out)
+		}
+	}
+}
+
 func findInvokeBlocks(text, name string) []string {
 	open := `<|DSML|invoke name="` + name + `">`
 	remaining := text

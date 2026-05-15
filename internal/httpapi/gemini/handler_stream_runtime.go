@@ -13,6 +13,7 @@ import (
 	"ds2api/internal/completionruntime"
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/responsehistory"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
@@ -41,7 +42,7 @@ func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Req
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession)
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
 
 	initialType := "text"
 	if thinkingEnabled {
@@ -80,6 +81,7 @@ type geminiStreamRuntime struct {
 	toolsRaw              any
 
 	accumulator       *assistantturn.Accumulator
+	responseReplacer  *responserewrite.StreamReplacer
 	contentFilter     bool
 	responseMessageID int
 	finalErrorStatus  int
@@ -106,7 +108,7 @@ func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r 
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession)
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
 		Surface:          "gemini.generate_content",
@@ -174,6 +176,7 @@ func newGeminiStreamRuntime(
 	toolNames []string,
 	toolsRaw any,
 	history *responsehistory.Session,
+	responseReplacer *responserewrite.StreamReplacer,
 ) *geminiStreamRuntime {
 	return &geminiStreamRuntime{
 		w:                     w,
@@ -188,10 +191,12 @@ func newGeminiStreamRuntime(
 		toolNames:             toolNames,
 		toolsRaw:              toolsRaw,
 		history:               history,
+		responseReplacer:      responseReplacer,
 		accumulator: assistantturn.NewAccumulator(assistantturn.AccumulatorOptions{
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
+			ResponseReplacer:      responseReplacer,
 		}),
 	}
 }
@@ -302,6 +307,10 @@ func (s *geminiStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 
 //nolint:unused // retained for native Gemini stream handling path.
 func (s *geminiStreamRuntime) finalize(deferEmptyOutput bool) bool {
+	// Flush any pending response replacements before building the turn.
+	if s.responseReplacer != nil {
+		s.accumulator.FlushResponseReplacements()
+	}
 	rawText, text, rawThinking, thinking, detectionThinking := s.accumulator.Snapshot()
 	turn := assistantturn.BuildTurnFromStreamSnapshot(assistantturn.StreamSnapshot{
 		RawText:           rawText,

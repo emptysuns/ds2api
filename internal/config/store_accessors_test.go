@@ -27,6 +27,37 @@ func TestStoreCurrentInputFileAccessors(t *testing.T) {
 	}
 }
 
+func TestResponseReplacementsAccessors(t *testing.T) {
+	enabled := true
+	store := &Store{cfg: Config{
+		ResponseReplacements: ResponseReplacementsConfig{
+			Enabled: &enabled,
+			Rules: []ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "   ", To: "ignored"},
+			},
+		},
+	}}
+
+	if !store.ResponseReplacementsEnabled() {
+		t.Fatal("expected response replacements enabled")
+	}
+
+	rules := store.ResponseReplacementRules()
+	if len(rules) != 1 {
+		t.Fatalf("expected one sanitized response replacement rule, got %#v", rules)
+	}
+	if rules[0].From != "<|DEML" || rules[0].To != "<|DSML" {
+		t.Fatalf("unexpected sanitized response replacement rule: %#v", rules[0])
+	}
+
+	rules[0].From = "mutated"
+	again := store.ResponseReplacementRules()
+	if len(again) != 1 || again[0].From != "<|DEML" || again[0].To != "<|DSML" {
+		t.Fatalf("response replacement rules should return copies, got %#v", again)
+	}
+}
+
 func TestStoreThinkingInjectionAccessors(t *testing.T) {
 	store := &Store{cfg: Config{}}
 	if !store.ThinkingInjectionEnabled() {

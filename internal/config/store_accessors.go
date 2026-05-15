@@ -247,6 +247,32 @@ func (s *Store) EmptyOutputRetrySuffixText() string {
 	return strings.TrimSpace(s.cfg.Prompt.EmptyOutputRetrySuffix.Text)
 }
 
+func (s *Store) ResponseReplacementsEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.ResponseReplacements.Enabled == nil {
+		return false
+	}
+	return *s.cfg.ResponseReplacements.Enabled
+}
+
+func (s *Store) ResponseReplacementRules() []ResponseReplacementRule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.cfg.ResponseReplacements.Rules) == 0 {
+		return nil
+	}
+	out := make([]ResponseReplacementRule, 0, len(s.cfg.ResponseReplacements.Rules))
+	for _, rule := range s.cfg.ResponseReplacements.Rules {
+		from := strings.TrimSpace(rule.From)
+		if from == "" {
+			continue
+		}
+		out = append(out, ResponseReplacementRule{From: from, To: rule.To})
+	}
+	return out
+}
+
 func (s *Store) ThinkingInjectionEnabled() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -278,4 +304,3 @@ func (s *Store) ClientConfigSnapshot() ClientConfig {
 		BaseHeaders:     headers,
 	}
 }
-

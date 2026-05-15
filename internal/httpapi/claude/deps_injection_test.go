@@ -1,12 +1,19 @@
 package claude
 
-import "testing"
+import (
+	"testing"
+
+	"ds2api/internal/config"
+)
 
 type mockClaudeConfig struct {
 	aliases map[string]string
 }
 
 func (m mockClaudeConfig) ModelAliases() map[string]string { return m.aliases }
+
+func (m mockClaudeConfig) ResponseReplacementsEnabled() bool { return false }
+func (m mockClaudeConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 func (mockClaudeConfig) CurrentInputFileEnabled() bool     { return true }
 func (mockClaudeConfig) CurrentInputFileMinChars() int     { return 0 }
 

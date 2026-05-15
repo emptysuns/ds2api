@@ -19,6 +19,7 @@ import (
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/requestbody"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/responsehistory"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/translatorcliproxy"
@@ -100,8 +101,9 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		RetryEnabled:     true,
-		CurrentInputFile: h.Store,
+		RetryEnabled:          true,
+		CurrentInputFile:      h.Store,
+		ResponseReplacements:  h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {
@@ -337,6 +339,7 @@ func (h *Handler) handleClaudeStreamRealtime(w http.ResponseWriter, r *http.Requ
 		toolsRaw,
 		buildClaudePromptTokenText(messages, thinkingEnabled),
 		historySession,
+		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.sendMessageStart()
 
@@ -395,6 +398,7 @@ func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *
 		toolsRaw,
 		promptTokenText,
 		historySession,
+		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.sendMessageStart()
 
@@ -470,4 +474,16 @@ func (h *Handler) consumeClaudeStreamAttempt(r *http.Request, resp *http.Respons
 		return true, false
 	}
 	return false, true
+}
+
+// responseReplacementRules returns the configured response replacement rules
+// if enabled, or nil if disabled or no rules are configured.
+func (h *Handler) responseReplacementRules() []config.ResponseReplacementRule {
+	if h == nil || h.Store == nil {
+		return nil
+	}
+	if !h.Store.ResponseReplacementsEnabled() {
+		return nil
+	}
+	return h.Store.ResponseReplacementRules()
 }

@@ -78,7 +78,7 @@ func (h *Handler) prepareResponsesStreamRuntime(w http.ResponseWriter, resp *htt
 		h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 		toolChoice, traceID, func(obj map[string]any) {
 			h.getResponseStore().put(owner, responseID, obj)
-		}, historySession,
+		}, historySession, nil, // responseReplacer
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	streamRuntime.sendCreated()

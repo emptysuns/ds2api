@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -43,6 +44,10 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	promptToolInstrSet := hasNestedSettingsKey(req, "prompt", "tool_call_instructions")
 	promptReadCacheSet := hasNestedSettingsKey(req, "prompt", "read_tool_cache_guard")
 	promptEmptyRetrySet := hasNestedSettingsKey(req, "prompt", "empty_output_retry_suffix")
+	responseReplEnabledSet := hasNestedSettingsKey(req, "response_replacements", "enabled")
+	responseReplRulesSet := hasNestedSettingsKey(req, "response_replacements", "rules")
+
+	responseReplacementsCfg := parseResponseReplacementsConfig(req["response_replacements"])
 
 	if err := h.Store.Update(func(c *config.Config) error {
 		if adminCfg != nil {
@@ -108,6 +113,14 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			if promptEmptyRetrySet {
 				c.Prompt.EmptyOutputRetrySuffix = promptCfg.EmptyOutputRetrySuffix
+			}
+		}
+		if responseReplacementsCfg != nil {
+			if responseReplEnabledSet {
+				c.ResponseReplacements.Enabled = responseReplacementsCfg.Enabled
+			}
+			if responseReplRulesSet {
+				c.ResponseReplacements.Rules = responseReplacementsCfg.Rules
 			}
 		}
 		if aliasMap != nil {
@@ -253,4 +266,30 @@ func hasNestedSettingsKey(req map[string]any, section, key string) bool {
 	}
 	_, exists := raw[key]
 	return exists
+}
+
+func parseResponseReplacementsConfig(v any) *config.ResponseReplacementsConfig {
+	raw, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	cfg := &config.ResponseReplacementsConfig{}
+	if v, exists := raw["enabled"]; exists {
+		b := BoolFrom(v)
+		cfg.Enabled = &b
+	}
+	if items, ok := raw["rules"].([]any); ok {
+		for _, item := range items {
+			m, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			from := strings.TrimSpace(fmt.Sprintf("%v", m["from"]))
+			if from == "" {
+				continue
+			}
+			cfg.Rules = append(cfg.Rules, config.ResponseReplacementRule{From: from, To: fmt.Sprintf("%v", m["to"])})
+		}
+	}
+	return cfg
 }
