@@ -19,8 +19,8 @@ import (
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/requestbody"
 	"ds2api/internal/promptcompat"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/responsehistory"
+	"ds2api/internal/responserewrite"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/translatorcliproxy"
 	"ds2api/internal/util"
@@ -101,9 +101,9 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		RetryEnabled:          true,
-		CurrentInputFile:      h.Store,
-		ResponseReplacements:  h.responseReplacementRules(),
+		RetryEnabled:         true,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {
@@ -137,7 +137,8 @@ func mapCurrentInputFileError(err error) (int, string) {
 
 func (h *Handler) handleClaudeDirectStream(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, stdReq promptcompat.StandardRequest, historySession *responsehistory.Session) {
 	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		CurrentInputFile: h.Store,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {
@@ -403,13 +404,14 @@ func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *
 	streamRuntime.sendMessageStart()
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
-		Surface:          "claude.messages",
-		Stream:           true,
-		RetryEnabled:     true,
-		MaxAttempts:      3,
-		UsagePrompt:      promptTokenText,
-		Request:          stdReq,
-		CurrentInputFile: h.Store,
+		Surface:              "claude.messages",
+		Stream:               true,
+		RetryEnabled:         true,
+		MaxAttempts:          3,
+		UsagePrompt:          promptTokenText,
+		Request:              stdReq,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, completionruntime.StreamRetryHooks{
 		ConsumeAttempt: func(currentResp *http.Response, allowDeferEmpty bool) (bool, bool) {
 			return h.consumeClaudeStreamAttempt(r, currentResp, streamRuntime, thinkingEnabled, allowDeferEmpty)

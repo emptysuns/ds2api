@@ -105,9 +105,9 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	})
 	if !stdReq.Stream {
 		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-			RetryEnabled:     true,
-			CurrentInputFile:      h.Store,
-				ResponseReplacements:  h.responseReplacementRules(),
+			RetryEnabled:         true,
+			CurrentInputFile:     h.Store,
+			ResponseReplacements: h.responseReplacementRules(),
 		})
 		if outErr != nil {
 			if historySession != nil {
@@ -127,7 +127,8 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		CurrentInputFile: h.Store,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {

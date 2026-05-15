@@ -13,6 +13,7 @@ import (
 	"ds2api/internal/config"
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/util"
 
 	"github.com/google/uuid"
@@ -96,7 +97,7 @@ func (h *Handler) handleVercelStreamPrepare(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	payload := stdReq.CompletionPayload(sessionID)
+	payload := stdReq.CompletionPayloadWithRequestReplacements(sessionID, responserewrite.ReverseRules(h.responseReplacementRules()))
 	leaseID := h.holdStreamLease(a, stdReq, sessionID)
 	if leaseID == "" {
 		writeOpenAIError(w, http.StatusInternalServerError, "failed to create stream lease")
@@ -263,7 +264,7 @@ func (h *Handler) handleVercelStreamSwitch(w http.ResponseWriter, r *http.Reques
 		"tool_names":       stdReq.ToolNames,
 		"deepseek_token":   a.DeepSeekToken,
 		"pow_header":       powHeader,
-		"payload":          stdReq.CompletionPayload(sessionID),
+		"payload":          stdReq.CompletionPayloadWithRequestReplacements(sessionID, responserewrite.ReverseRules(h.responseReplacementRules())),
 	})
 }
 

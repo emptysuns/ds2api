@@ -11,7 +11,94 @@ import (
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 	"ds2api/internal/httpapi/openai/shared"
+	"ds2api/internal/promptcompat"
 )
+
+func TestExecuteStreamWithRetryRewritesPromptAfterCurrentInputAccountSwitch(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["managed-key"],
+		"accounts":[
+			{"email":"acc1@test.com","password":"pwd"},
+			{"email":"acc2@test.com","password":"pwd"}
+		]
+	}`)
+	store := config.LoadStore()
+	resolver := auth.NewResolver(store, account.NewPool(store), func(_ context.Context, acc config.Account) (string, error) {
+		return "token-" + acc.Identifier(), nil
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	req.Header.Set("Authorization", "Bearer managed-key")
+	a, err := resolver.Determine(req)
+	if err != nil {
+		t.Fatalf("determine failed: %v", err)
+	}
+	defer resolver.Release(a)
+
+	ds := &fakeDeepSeekCaller{
+		sessionByAccount: true,
+		responses: []*http.Response{
+			sseHTTPResponse(http.StatusOK, `data: {"response_message_id":12,"p":"response/thinking_content","v":"retry empty"}`),
+			sseHTTPResponse(http.StatusOK, `data: {"response_message_id":21,"p":"response/content","v":"ok from second account"}`),
+		},
+	}
+	initial := sseHTTPResponse(http.StatusOK, `data: {"response_message_id":11,"p":"response/thinking_content","v":"first empty"}`)
+	payload := map[string]any{"prompt": `<|DEML|tool_calls>`, "chat_session_id": "session-acc1@test.com"}
+	attemptsSeen := 0
+	stdReq := promptcompat.StandardRequest{
+		RequestedModel:          "deepseek-v4-flash",
+		ResolvedModel:           "deepseek-v4-flash",
+		FinalPrompt:             `<|DSML|tool_calls><|DSML|invoke name="search"></|DSML|invoke></|DSML|tool_calls>`,
+		HistoryText:             "large current input",
+		CurrentInputFileApplied: true,
+		CurrentInputFileID:      "file-runtime-acc1@test.com",
+		RefFileIDs:              []string{"file-runtime-acc1@test.com"},
+	}
+
+	ExecuteStreamWithRetry(context.Background(), ds, a, initial, payload, "pow", StreamRetryOptions{
+		Surface:          "test.stream",
+		Stream:           true,
+		RetryEnabled:     true,
+		RetryMaxAttempts: 1,
+		UsagePrompt:      stdReq.FinalPrompt,
+		Request:          stdReq,
+		CurrentInputFile: currentInputRuntimeConfig{},
+		ResponseReplacements: []config.ResponseReplacementRule{
+			{From: "<|DEML", To: "<|DSML"},
+			{From: "</|DEML", To: "</|DSML"},
+		},
+	}, StreamRetryHooks{
+		ConsumeAttempt: func(resp *http.Response, allowDeferEmpty bool) (bool, bool) {
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Fatalf("close failed: %v", err)
+				}
+			}()
+			body, _ := io.ReadAll(resp.Body)
+			attemptsSeen++
+			if strings.Contains(string(body), "ok from second account") {
+				return true, false
+			}
+			if !allowDeferEmpty {
+				t.Fatalf("expected empty attempt %d to be deferred before final 429", attemptsSeen)
+			}
+			return false, true
+		},
+		ParentMessageID: func() int {
+			return 11 + attemptsSeen
+		},
+	})
+
+	if len(ds.payloads) != 2 {
+		t.Fatalf("expected retry and switched-account payloads, got %d", len(ds.payloads))
+	}
+	wantPrompt := `<|DEML|tool_calls><|DEML|invoke name="search"></|DEML|invoke></|DEML|tool_calls>`
+	if got := ds.payloads[1]["prompt"]; got != wantPrompt {
+		t.Fatalf("switched prompt=%q want %q", got, wantPrompt)
+	}
+	if got := ds.payloads[1]["chat_session_id"]; got != "session-acc2@test.com" {
+		t.Fatalf("switched payload session mismatch: %#v", got)
+	}
+}
 
 func TestExecuteStreamWithRetryUsesSharedRetryPayloadAndUsagePrompt(t *testing.T) {
 	ds := &fakeDeepSeekCaller{responses: []*http.Response{

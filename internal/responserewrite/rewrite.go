@@ -18,6 +18,21 @@ func Apply(text string, rules []Rule) string {
 	return text
 }
 
+func ReverseRules(rules []Rule) []Rule {
+	if len(rules) == 0 {
+		return nil
+	}
+	out := make([]Rule, 0, len(rules))
+	for _, rule := range rules {
+		from := strings.TrimSpace(rule.To)
+		if from == "" {
+			continue
+		}
+		out = append(out, Rule{From: from, To: rule.From})
+	}
+	return out
+}
+
 type StreamReplacer struct {
 	rules   []Rule
 	pending string
@@ -47,10 +62,40 @@ func (r *StreamReplacer) Push(chunk string) string {
 	if len(r.pending) <= r.keep {
 		return ""
 	}
-	emitLen := len(r.pending) - r.keep
+	emitLen := r.safeEmitLen()
+	if emitLen <= 0 {
+		return ""
+	}
 	emit := r.pending[:emitLen]
 	r.pending = r.pending[emitLen:]
 	return Apply(emit, r.rules)
+}
+
+func (r *StreamReplacer) safeEmitLen() int {
+	emitLen := len(r.pending) - r.keep
+	if emitLen <= 0 {
+		return 0
+	}
+	for _, rule := range r.rules {
+		from := rule.From
+		if from == "" {
+			continue
+		}
+		startMin := emitLen - len(from) + 1
+		if startMin < 0 {
+			startMin = 0
+		}
+		for start := startMin; start < emitLen && start < len(r.pending); start++ {
+			prefixLen := len(r.pending) - start
+			if prefixLen > len(from) {
+				prefixLen = len(from)
+			}
+			if prefixLen > 0 && strings.HasPrefix(from, r.pending[start:start+prefixLen]) {
+				return start
+			}
+		}
+	}
+	return emitLen
 }
 
 func (r *StreamReplacer) Flush() string {

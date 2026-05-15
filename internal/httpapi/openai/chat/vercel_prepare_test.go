@@ -2,8 +2,8 @@ package chat
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -145,6 +145,71 @@ func TestHandleVercelStreamPrepareAppliesCurrentInputFile(t *testing.T) {
 	refIDs, _ := payload["ref_file_ids"].([]any)
 	if len(refIDs) == 0 || refIDs[0] != "file-inline-1" {
 		t.Fatalf("expected uploaded history file first in ref_file_ids, got %#v", payload["ref_file_ids"])
+	}
+}
+
+func TestHandleVercelStreamPrepareRewritesPayloadPromptOnly(t *testing.T) {
+	t.Setenv("VERCEL", "1")
+	t.Setenv("DS2API_VERCEL_INTERNAL_SECRET", "stream-secret")
+
+	h := &Handler{
+		Store: mockOpenAIConfig{
+			responseReplacementsEnabled: true,
+			responseReplacementRules: []config.ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "</|DEML", To: "</|DSML"},
+			},
+		},
+		Auth: streamStatusAuthStub{},
+		DS:   &inlineUploadDSStub{},
+	}
+
+	reqBody, _ := json.Marshal(map[string]any{
+		"model": "deepseek-v4-flash",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "search docs"},
+		},
+		"tools": []any{
+			map[string]any{
+				"type": "function",
+				"function": map[string]any{
+					"name":        "search",
+					"description": "search docs",
+					"parameters": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"query": map[string]any{"type": "string"},
+						},
+						"required": []any{"query"},
+					},
+				},
+			},
+		},
+		"stream": true,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions?__stream_prepare=1", strings.NewReader(string(reqBody)))
+	req.Header.Set("Authorization", "Bearer direct-token")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Ds2-Internal-Token", "stream-secret")
+	rec := httptest.NewRecorder()
+
+	h.handleVercelStreamPrepare(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	finalPrompt, _ := body["final_prompt"].(string)
+	payload, _ := body["payload"].(map[string]any)
+	payloadPrompt, _ := payload["prompt"].(string)
+	if !strings.Contains(finalPrompt, "<|DSML|tool_calls>") || strings.Contains(finalPrompt, "<|DEML") {
+		t.Fatalf("expected final_prompt to remain internal DSML, got %q", finalPrompt)
+	}
+	if !strings.Contains(payloadPrompt, "<|DEML|tool_calls>") || strings.Contains(payloadPrompt, "<|DSML") {
+		t.Fatalf("expected payload prompt to be reversed to DEML only, got %q", payloadPrompt)
 	}
 }
 

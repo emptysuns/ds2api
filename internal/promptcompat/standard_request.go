@@ -1,6 +1,9 @@
 package promptcompat
 
-import "ds2api/internal/config"
+import (
+	"ds2api/internal/config"
+	"ds2api/internal/responserewrite"
+)
 
 type StandardRequest struct {
 	Surface                 string
@@ -61,6 +64,10 @@ func (p ToolChoicePolicy) Allows(name string) bool {
 }
 
 func (r StandardRequest) CompletionPayload(sessionID string) map[string]any {
+	return r.CompletionPayloadWithRequestReplacements(sessionID, nil)
+}
+
+func (r StandardRequest) CompletionPayloadWithRequestReplacements(sessionID string, requestReplacements []config.ResponseReplacementRule) map[string]any {
 	modelID := r.ResolvedModel
 	if modelID == "" {
 		modelID = r.RequestedModel
@@ -76,11 +83,15 @@ func (r StandardRequest) CompletionPayload(sessionID string) map[string]any {
 		}
 		refFileIDs = append(refFileIDs, fileID)
 	}
+	prompt := r.FinalPrompt
+	if len(requestReplacements) > 0 {
+		prompt = responserewrite.Apply(prompt, requestReplacements)
+	}
 	payload := map[string]any{
 		"chat_session_id":   sessionID,
 		"model_type":        modelType,
 		"parent_message_id": nil,
-		"prompt":            r.FinalPrompt,
+		"prompt":            prompt,
 		"ref_file_ids":      refFileIDs,
 		"thinking_enabled":  r.Thinking,
 		"search_enabled":    r.Search,

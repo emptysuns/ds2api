@@ -1,6 +1,52 @@
 package promptcompat
 
-import "testing"
+import (
+	"testing"
+
+	"ds2api/internal/config"
+)
+
+func TestCompletionPayloadAppliesRequestReplacementsToPromptOnly(t *testing.T) {
+	req := StandardRequest{
+		RequestedModel: "deepseek-chat",
+		FinalPrompt:    `<|DSML|tool_calls><|DSML|invoke name="search"></|DSML|invoke></|DSML|tool_calls>`,
+		PassThrough: map[string]any{
+			"metadata": `<|DSML|should_not_change>`,
+		},
+	}
+
+	payload := req.CompletionPayloadWithRequestReplacements("session-1", []config.ResponseReplacementRule{
+		{From: "<|DSML", To: "<|DEML"},
+		{From: "</|DSML", To: "</|DEML"},
+	})
+
+	gotPrompt, _ := payload["prompt"].(string)
+	wantPrompt := `<|DEML|tool_calls><|DEML|invoke name="search"></|DEML|invoke></|DEML|tool_calls>`
+	if gotPrompt != wantPrompt {
+		t.Fatalf("prompt=%q want %q", gotPrompt, wantPrompt)
+	}
+
+	if req.FinalPrompt != `<|DSML|tool_calls><|DSML|invoke name="search"></|DSML|invoke></|DSML|tool_calls>` {
+		t.Fatalf("FinalPrompt was mutated: %q", req.FinalPrompt)
+	}
+
+	if payload["metadata"] != `<|DSML|should_not_change>` {
+		t.Fatalf("metadata was unexpectedly replaced: %#v", payload["metadata"])
+	}
+}
+
+func TestCompletionPayloadKeepsPromptUnchangedByDefault(t *testing.T) {
+	req := StandardRequest{
+		RequestedModel: "deepseek-chat",
+		FinalPrompt:    `<|DSML|tool_calls>`,
+	}
+
+	payload := req.CompletionPayload("session-1")
+
+	if got := payload["prompt"]; got != `<|DSML|tool_calls>` {
+		t.Fatalf("prompt=%q want unchanged DSML prompt", got)
+	}
+}
 
 func TestStandardRequestCompletionPayloadSetsModelTypeFromResolvedModel(t *testing.T) {
 	tests := []struct {

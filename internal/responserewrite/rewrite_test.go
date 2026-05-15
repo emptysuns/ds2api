@@ -29,6 +29,44 @@ func TestApplyPreservesNonEmptyFromWhitespace(t *testing.T) {
 	}
 }
 
+func TestReverseRulesSwapsFromAndTo(t *testing.T) {
+	rules := []config.ResponseReplacementRule{
+		{From: "<|DEML", To: "<|DSML"},
+		{From: "</|DEML", To: "</|DSML"},
+	}
+
+	got := ReverseRules(rules)
+
+	want := []config.ResponseReplacementRule{
+		{From: "<|DSML", To: "<|DEML"},
+		{From: "</|DSML", To: "</|DEML"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len=%d want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("rule[%d]=%#v want %#v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestReverseRulesSkipsEmptyTo(t *testing.T) {
+	rules := []config.ResponseReplacementRule{
+		{From: "x", To: ""},
+		{From: "a", To: "b"},
+	}
+
+	got := ReverseRules(rules)
+
+	if len(got) != 1 {
+		t.Fatalf("len=%d want 1: %#v", len(got), got)
+	}
+	if got[0] != (config.ResponseReplacementRule{From: "b", To: "a"}) {
+		t.Fatalf("got %#v", got[0])
+	}
+}
+
 func TestStreamReplacerHandlesBoundarySplit(t *testing.T) {
 	r := NewStreamReplacer([]config.ResponseReplacementRule{{From: "<|DEML", To: "<|DSML"}})
 	parts := []string{
@@ -52,6 +90,40 @@ func TestStreamReplacerHandlesBoundarySplitAtEnd(t *testing.T) {
 	}
 	got := parts[0] + parts[1] + parts[2]
 	want := "<|DSML"
+	if got != want {
+		t.Fatalf("stream replacement=%q want=%q parts=%#v", got, want, parts)
+	}
+}
+
+func TestStreamReplacerDoesNotSplitClosingMatchAcrossEmitBoundary(t *testing.T) {
+	r := NewStreamReplacer([]config.ResponseReplacementRule{
+		{From: "<|DEML", To: "<|DSML"},
+		{From: "</|DEML", To: "</|DSML"},
+	})
+
+	parts := []string{
+		r.Push("</|DEML|tool_"),
+		r.Flush(),
+	}
+	got := parts[0] + parts[1]
+	want := "</|DSML|tool_"
+	if got != want {
+		t.Fatalf("stream replacement=%q want=%q parts=%#v", got, want, parts)
+	}
+}
+
+func TestStreamReplacerDoesNotSplitOpeningMatchAcrossEmitBoundary(t *testing.T) {
+	r := NewStreamReplacer([]config.ResponseReplacementRule{
+		{From: "<|DEML", To: "<|DSML"},
+		{From: "</|DEML", To: "</|DSML"},
+	})
+
+	parts := []string{
+		r.Push("<|DEML|i"),
+		r.Flush(),
+	}
+	got := parts[0] + parts[1]
+	want := "<|DSML|i"
 	if got != want {
 		t.Fatalf("stream replacement=%q want=%q parts=%#v", got, want, parts)
 	}

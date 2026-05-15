@@ -14,6 +14,7 @@ import (
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 )
 
@@ -66,7 +67,7 @@ func StartCompletion(ctx context.Context, ds DeepSeekCaller, a *auth.RequestAuth
 	if err != nil {
 		return StartResult{SessionID: sessionID, Request: stdReq}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
 	}
-	payload := stdReq.CompletionPayload(sessionID)
+	payload := stdReq.CompletionPayloadWithRequestReplacements(sessionID, responserewrite.ReverseRules(opts.ResponseReplacements))
 	resp, err := ds.CallCompletion(ctx, a, payload, pow, maxAttempts)
 	if err != nil {
 		return StartResult{SessionID: sessionID, Payload: payload, Pow: pow, Request: stdReq}, &assistantturn.OutputError{Status: http.StatusInternalServerError, Message: "Failed to get completion.", Code: "error"}
@@ -220,7 +221,7 @@ func startStandardCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekC
 	if err != nil {
 		return StartResult{SessionID: sessionID}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
 	}
-	payload := stdReq.CompletionPayload(sessionID)
+	payload := stdReq.CompletionPayloadWithRequestReplacements(sessionID, responserewrite.ReverseRules(opts.ResponseReplacements))
 	resp, err := ds.CallCompletion(ctx, a, payload, pow, maxAttempts)
 	if err != nil {
 		return StartResult{SessionID: sessionID, Payload: payload, Pow: pow}, &assistantturn.OutputError{Status: http.StatusInternalServerError, Message: "Failed to get completion.", Code: "error"}

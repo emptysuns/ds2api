@@ -278,6 +278,40 @@ func TestExecuteNonStreamWithRetryConvertsReferenceMarkers(t *testing.T) {
 	}
 }
 
+func TestStartCompletionAppliesReverseResponseReplacementsToPromptOnly(t *testing.T) {
+	ds := &fakeDeepSeekCaller{responses: []*http.Response{sseHTTPResponse(http.StatusOK, `data: {"p":"response/content","v":"ok"}`)}}
+	stdReq := promptcompat.StandardRequest{
+		RequestedModel: "deepseek-v4-flash",
+		FinalPrompt:    `<|DSML|tool_calls><|DSML|invoke name="search"></|DSML|invoke></|DSML|tool_calls>`,
+		PassThrough: map[string]any{
+			"metadata": `<|DSML|should_not_change>`,
+		},
+	}
+
+	start, outErr := StartCompletion(context.Background(), ds, &auth.RequestAuth{DeepSeekToken: "token"}, stdReq, Options{
+		ResponseReplacements: []config.ResponseReplacementRule{
+			{From: "<|DEML", To: "<|DSML"},
+			{From: "</|DEML", To: "</|DSML"},
+		},
+	})
+	if outErr != nil {
+		t.Fatalf("unexpected output error: %#v", outErr)
+	}
+	if len(ds.payloads) != 1 {
+		t.Fatalf("expected one completion payload, got %d", len(ds.payloads))
+	}
+	wantPrompt := `<|DEML|tool_calls><|DEML|invoke name="search"></|DEML|invoke></|DEML|tool_calls>`
+	if got := ds.payloads[0]["prompt"]; got != wantPrompt {
+		t.Fatalf("prompt=%q want %q", got, wantPrompt)
+	}
+	if got := ds.payloads[0]["metadata"]; got != `<|DSML|should_not_change>` {
+		t.Fatalf("metadata was unexpectedly replaced: %#v", got)
+	}
+	if start.Request.FinalPrompt != stdReq.FinalPrompt {
+		t.Fatalf("FinalPrompt was mutated: %q", start.Request.FinalPrompt)
+	}
+}
+
 func TestStartCompletionAppliesCurrentInputFileGlobally(t *testing.T) {
 	ds := &fakeDeepSeekCaller{responses: []*http.Response{sseHTTPResponse(http.StatusOK, `data: {"p":"response/content","v":"ok"}`)}}
 	stdReq := promptcompat.StandardRequest{

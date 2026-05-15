@@ -73,14 +73,15 @@ func (h *Handler) handleStreamWithRetry(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
-		Surface:          "chat.completions",
-		Stream:           true,
-		RetryEnabled:     emptyOutputRetryEnabled(),
-		RetryMaxAttempts: emptyOutputRetryMaxAttempts(),
-		MaxAttempts:      3,
-		UsagePrompt:      finalPrompt,
-		Request:          stdReq,
-		CurrentInputFile: h.Store,
+		Surface:              "chat.completions",
+		Stream:               true,
+		RetryEnabled:         emptyOutputRetryEnabled(),
+		RetryMaxAttempts:     emptyOutputRetryMaxAttempts(),
+		MaxAttempts:          3,
+		UsagePrompt:          finalPrompt,
+		Request:              stdReq,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, completionruntime.StreamRetryHooks{
 		ConsumeAttempt: func(currentResp *http.Response, allowDeferEmpty bool) (bool, bool) {
 			return h.consumeChatStreamAttempt(r, currentResp, streamRuntime, initialType, thinkingEnabled, historySession, allowDeferEmpty)

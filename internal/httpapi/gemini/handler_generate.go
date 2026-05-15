@@ -15,9 +15,9 @@ import (
 	"ds2api/internal/assistantturn"
 	"ds2api/internal/auth"
 	"ds2api/internal/completionruntime"
+	"ds2api/internal/config"
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/requestbody"
-	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
 	"ds2api/internal/sse"
@@ -98,9 +98,9 @@ func (h *Handler) handleGeminiDirect(w http.ResponseWriter, r *http.Request, str
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		RetryEnabled:          true,
-		CurrentInputFile:      h.Store,
-		ResponseReplacements:  h.responseReplacementRules(),
+		RetryEnabled:         true,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {
@@ -129,7 +129,8 @@ func mapCurrentInputFileError(err error) (int, string) {
 
 func (h *Handler) handleGeminiDirectStream(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, stdReq promptcompat.StandardRequest, historySession *responsehistory.Session) {
 	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		CurrentInputFile: h.Store,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	})
 	if outErr != nil {
 		if historySession != nil {

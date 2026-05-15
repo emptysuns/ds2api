@@ -21,14 +21,15 @@ func (h *Handler) handleResponsesStreamWithRetry(w http.ResponseWriter, r *http.
 		return
 	}
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
-		Surface:          "responses",
-		Stream:           true,
-		RetryEnabled:     emptyOutputRetryEnabled(),
-		RetryMaxAttempts: emptyOutputRetryMaxAttempts(),
-		MaxAttempts:      3,
-		UsagePrompt:      finalPrompt,
-		Request:          stdReq,
-		CurrentInputFile: h.Store,
+		Surface:              "responses",
+		Stream:               true,
+		RetryEnabled:         emptyOutputRetryEnabled(),
+		RetryMaxAttempts:     emptyOutputRetryMaxAttempts(),
+		MaxAttempts:          3,
+		UsagePrompt:          finalPrompt,
+		Request:              stdReq,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, completionruntime.StreamRetryHooks{
 		ConsumeAttempt: func(currentResp *http.Response, allowDeferEmpty bool) (bool, bool) {
 			return h.consumeResponsesStreamAttempt(r, currentResp, streamRuntime, initialType, thinkingEnabled, allowDeferEmpty)

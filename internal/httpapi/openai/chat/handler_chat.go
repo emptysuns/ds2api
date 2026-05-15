@@ -85,9 +85,9 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	if !stdReq.Stream {
 		result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-			RetryEnabled:          true,
-			CurrentInputFile:      h.Store,
-			ResponseReplacements:  h.responseReplacementRules(),
+			RetryEnabled:         true,
+			CurrentInputFile:     h.Store,
+			ResponseReplacements: h.responseReplacementRules(),
 		})
 		sessionID = result.SessionID
 		if outErr != nil {
@@ -108,7 +108,8 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{
-		CurrentInputFile: h.Store,
+		CurrentInputFile:     h.Store,
+		ResponseReplacements: h.responseReplacementRules(),
 	})
 	sessionID = start.SessionID
 	if outErr != nil {

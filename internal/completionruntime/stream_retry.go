@@ -12,17 +12,19 @@ import (
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 )
 
 type StreamRetryOptions struct {
-	Surface          string
-	Stream           bool
-	RetryEnabled     bool
-	RetryMaxAttempts int
-	MaxAttempts      int
-	UsagePrompt      string
-	Request          promptcompat.StandardRequest
-	CurrentInputFile history.CurrentInputConfigReader
+	Surface              string
+	Stream               bool
+	RetryEnabled         bool
+	RetryMaxAttempts     int
+	MaxAttempts          int
+	UsagePrompt          string
+	Request              promptcompat.StandardRequest
+	CurrentInputFile     history.CurrentInputConfigReader
+	ResponseReplacements []config.ResponseReplacementRule
 }
 
 type StreamRetryHooks struct {
@@ -161,7 +163,7 @@ func startPayloadCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekCa
 		if prepErr != nil {
 			return StartResult{SessionID: sessionID}, prepErr
 		}
-		nextPayload = stdReq.CompletionPayload(sessionID)
+		nextPayload = stdReq.CompletionPayloadWithRequestReplacements(sessionID, responserewrite.ReverseRules(opts.ResponseReplacements))
 	}
 	nextPayload["chat_session_id"] = sessionID
 	delete(nextPayload, "parent_message_id")
