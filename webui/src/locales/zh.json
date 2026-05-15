@@ -469,6 +469,12 @@
         "promptEmptyRetryDesc": "默认开启。当 DeepSeek 返回空输出时，在重试请求末尾追加提示后缀。",
         "promptEmptyRetryText": "重试后缀自定义文本",
         "promptEmptyRetryHelp": "留空时使用内置默认文本。",
+        "responseReplacementsEnabled": "远端回复替换",
+        "responseReplacementsDesc": "默认关闭。对 DeepSeek 返回内容执行字符串替换，替换后会用于工具解析和最终 API 输出，支持流式。",
+        "responseReplacementFrom": "原始文本",
+        "responseReplacementTo": "替换为",
+        "responseReplacementAdd": "添加替换规则",
+        "responseReplacementRemove": "删除",
         "autoFetchPaused": "自动加载已暂停：连续失败 {count} 次（{error}）",
         "retryLoad": "立即重试"
     },

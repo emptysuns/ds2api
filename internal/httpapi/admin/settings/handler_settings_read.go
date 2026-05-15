@@ -58,6 +58,10 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 				"text":    h.Store.EmptyOutputRetrySuffixText(),
 			},
 		},
+		"response_replacements": map[string]any{
+			"enabled": h.Store.ResponseReplacementsEnabled(),
+			"rules":   h.Store.ResponseReplacementRules(),
+		},
 		"model_aliases": snap.ModelAliases,
 		"client": map[string]any{
 			"name":              snap.Client.Name,

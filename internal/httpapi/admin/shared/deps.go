@@ -47,6 +47,8 @@ type ConfigStore interface {
 	ReadToolCacheGuardText() string
 	EmptyOutputRetrySuffixEnabled() bool
 	EmptyOutputRetrySuffixText() string
+	ResponseReplacementsEnabled() bool
+	ResponseReplacementRules() []config.ResponseReplacementRule
 	ClientConfigSnapshot() config.ClientConfig
 	AutoDeleteSessions() bool
 }

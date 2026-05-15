@@ -469,6 +469,12 @@
         "promptEmptyRetryDesc": "Enabled by default. Appends a retry hint suffix when DeepSeek returns empty output.",
         "promptEmptyRetryText": "Custom retry suffix text",
         "promptEmptyRetryHelp": "Leave empty to use the built-in default text.",
+        "responseReplacementsEnabled": "Remote Response Replacements",
+        "responseReplacementsDesc": "Disabled by default. Applies literal string replacements to DeepSeek response text before tool parsing and final API output, including streaming.",
+        "responseReplacementFrom": "From",
+        "responseReplacementTo": "To",
+        "responseReplacementAdd": "Add replacement rule",
+        "responseReplacementRemove": "Remove",
         "autoFetchPaused": "Auto loading paused after {count} failures: {error}",
         "retryLoad": "Retry now"
     },
