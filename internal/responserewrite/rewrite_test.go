@@ -43,6 +43,20 @@ func TestStreamReplacerHandlesBoundarySplit(t *testing.T) {
 	}
 }
 
+func TestStreamReplacerHandlesBoundarySplitAtEnd(t *testing.T) {
+	r := NewStreamReplacer([]config.ResponseReplacementRule{{From: "<|DEML", To: "<|DSML"}})
+	parts := []string{
+		r.Push("<|DE"),
+		r.Push("ML"),
+		r.Flush(),
+	}
+	got := parts[0] + parts[1] + parts[2]
+	want := "<|DSML"
+	if got != want {
+		t.Fatalf("stream replacement=%q want=%q parts=%#v", got, want, parts)
+	}
+}
+
 func TestStreamReplacerReturnsInputWhenNoRules(t *testing.T) {
 	r := NewStreamReplacer(nil)
 	if got := r.Push("abc"); got != "abc" {

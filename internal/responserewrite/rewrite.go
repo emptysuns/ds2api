@@ -32,7 +32,7 @@ func NewStreamReplacer(rules []Rule) *StreamReplacer {
 			continue
 		}
 		clean = append(clean, rule)
-		if n := len(rule.From) - 1; n > keep {
+		if n := len(rule.From); n > keep {
 			keep = n
 		}
 	}
