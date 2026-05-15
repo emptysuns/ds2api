@@ -208,6 +208,11 @@ type TextBlockConfig struct {
 	Text    string `json:"text,omitempty"`
 }
 
+type ResponseReplacementRule struct {
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+}
+
 type ClientConfig struct {
 	Name            string            `json:"name,omitempty"`
 	Platform        string            `json:"platform,omitempty"`
