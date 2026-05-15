@@ -8,34 +8,35 @@ import (
 )
 
 type Config struct {
-	Keys              []string                `json:"keys,omitempty"`
-	APIKeys           []APIKey                `json:"api_keys,omitempty"`
-	Accounts          []Account               `json:"accounts,omitempty"`
-	Proxies           []Proxy                 `json:"proxies,omitempty"`
-	ModelAliases      map[string]string       `json:"model_aliases,omitempty"`
-	Admin             AdminConfig             `json:"admin,omitempty"`
-	Runtime           RuntimeConfig           `json:"runtime,omitempty"`
-	Responses         ResponsesConfig         `json:"responses,omitempty"`
-	Embeddings        EmbeddingsConfig        `json:"embeddings,omitempty"`
-	AutoDelete        AutoDeleteConfig        `json:"auto_delete"`
-	CurrentInputFile  CurrentInputFileConfig  `json:"current_input_file,omitempty"`
-	ThinkingInjection ThinkingInjectionConfig `json:"thinking_injection,omitempty"`
-	Prompt            PromptConfig            `json:"prompt,omitempty"`
-	Client            ClientConfig            `json:"client,omitempty"`
-	Vercel            VercelConfig            `json:"vercel,omitempty"`
-	VercelSyncHash    string                  `json:"_vercel_sync_hash,omitempty"`
-	VercelSyncTime    int64                   `json:"_vercel_sync_time,omitempty"`
-	AdditionalFields  map[string]any          `json:"-"`
+	Keys                 []string                   `json:"keys,omitempty"`
+	APIKeys              []APIKey                   `json:"api_keys,omitempty"`
+	Accounts             []Account                  `json:"accounts,omitempty"`
+	Proxies              []Proxy                    `json:"proxies,omitempty"`
+	ModelAliases         map[string]string          `json:"model_aliases,omitempty"`
+	Admin                AdminConfig                `json:"admin,omitempty"`
+	Runtime              RuntimeConfig              `json:"runtime,omitempty"`
+	Responses            ResponsesConfig            `json:"responses,omitempty"`
+	Embeddings           EmbeddingsConfig           `json:"embeddings,omitempty"`
+	AutoDelete           AutoDeleteConfig           `json:"auto_delete"`
+	CurrentInputFile     CurrentInputFileConfig     `json:"current_input_file,omitempty"`
+	ThinkingInjection    ThinkingInjectionConfig    `json:"thinking_injection,omitempty"`
+	Prompt               PromptConfig               `json:"prompt,omitempty"`
+	ResponseReplacements ResponseReplacementsConfig `json:"response_replacements,omitempty"`
+	Client               ClientConfig               `json:"client,omitempty"`
+	Vercel               VercelConfig               `json:"vercel,omitempty"`
+	VercelSyncHash       string                     `json:"_vercel_sync_hash,omitempty"`
+	VercelSyncTime       int64                      `json:"_vercel_sync_time,omitempty"`
+	AdditionalFields     map[string]any             `json:"-"`
 }
 
 type Account struct {
-	Name     string `json:"name,omitempty"`
-	Remark   string `json:"remark,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Mobile   string `json:"mobile,omitempty"`
-	Password string `json:"password,omitempty"`
-	Token    string `json:"token,omitempty"`
-	ProxyID  string `json:"proxy_id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Remark    string `json:"remark,omitempty"`
+	Email     string `json:"email,omitempty"`
+	Mobile    string `json:"mobile,omitempty"`
+	Password  string `json:"password,omitempty"`
+	Token     string `json:"token,omitempty"`
+	ProxyID   string `json:"proxy_id,omitempty"`
 	DeviceID  string `json:"device_id,omitempty"`
 	RangersID string `json:"rangers_id,omitempty"`
 }
@@ -183,12 +184,12 @@ type ThinkingInjectionConfig struct {
 }
 
 type PromptConfig struct {
-	OutputIntegrityGuard     *bool              `json:"output_integrity_guard,omitempty"`
-	OutputIntegrityGuardText string             `json:"output_integrity_guard_text,omitempty"`
-	Sentinels                *SentinelConfig    `json:"sentinels,omitempty"`
-	ToolCallInstructions     *TextBlockConfig   `json:"tool_call_instructions,omitempty"`
-	ReadToolCacheGuard       *TextBlockConfig   `json:"read_tool_cache_guard,omitempty"`
-	EmptyOutputRetrySuffix   *TextBlockConfig   `json:"empty_output_retry_suffix,omitempty"`
+	OutputIntegrityGuard     *bool            `json:"output_integrity_guard,omitempty"`
+	OutputIntegrityGuardText string           `json:"output_integrity_guard_text,omitempty"`
+	Sentinels                *SentinelConfig  `json:"sentinels,omitempty"`
+	ToolCallInstructions     *TextBlockConfig `json:"tool_call_instructions,omitempty"`
+	ReadToolCacheGuard       *TextBlockConfig `json:"read_tool_cache_guard,omitempty"`
+	EmptyOutputRetrySuffix   *TextBlockConfig `json:"empty_output_retry_suffix,omitempty"`
 }
 
 type SentinelConfig struct {
@@ -206,6 +207,16 @@ type SentinelConfig struct {
 type TextBlockConfig struct {
 	Enabled *bool  `json:"enabled,omitempty"`
 	Text    string `json:"text,omitempty"`
+}
+
+type ResponseReplacementsConfig struct {
+	Enabled *bool                     `json:"enabled,omitempty"`
+	Rules   []ResponseReplacementRule `json:"rules,omitempty"`
+}
+
+type ResponseReplacementRule struct {
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
 }
 
 type ClientConfig struct {

@@ -221,6 +221,45 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	}
 }
 
+func TestConfigJSONRoundtripPreservesResponseReplacements(t *testing.T) {
+	enabled := true
+	cfg := Config{
+		Keys: []string{"k1"},
+		ResponseReplacements: ResponseReplacementsConfig{
+			Enabled: &enabled,
+			Rules: []ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "</|DEML", To: "</|DSML"},
+			},
+		},
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	if !strings.Contains(string(data), `"response_replacements"`) {
+		t.Fatalf("expected response_replacements field to marshal, got %s", data)
+	}
+
+	var decoded Config
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if decoded.ResponseReplacements.Enabled == nil || !*decoded.ResponseReplacements.Enabled {
+		t.Fatalf("expected response replacements enabled, got %#v", decoded.ResponseReplacements.Enabled)
+	}
+	if len(decoded.ResponseReplacements.Rules) != 2 {
+		t.Fatalf("expected two response replacement rules, got %#v", decoded.ResponseReplacements.Rules)
+	}
+	if decoded.ResponseReplacements.Rules[0].From != "<|DEML" || decoded.ResponseReplacements.Rules[0].To != "<|DSML" {
+		t.Fatalf("unexpected first response replacement rule: %#v", decoded.ResponseReplacements.Rules[0])
+	}
+	if decoded.ResponseReplacements.Rules[1].From != "</|DEML" || decoded.ResponseReplacements.Rules[1].To != "</|DSML" {
+		t.Fatalf("unexpected second response replacement rule: %#v", decoded.ResponseReplacements.Rules[1])
+	}
+}
+
 func TestConfigJSONRoundtripPreservesPromptConfig(t *testing.T) {
 	guardEnabled := false
 	sentinelsEnabled := true

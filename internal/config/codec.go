@@ -51,6 +51,9 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if hasPromptConfig(c.Prompt) {
 		m["prompt"] = c.Prompt
 	}
+	if c.ResponseReplacements.Enabled != nil || len(c.ResponseReplacements.Rules) > 0 {
+		m["response_replacements"] = c.ResponseReplacements
+	}
 	if strings.TrimSpace(c.Vercel.Token) != "" || strings.TrimSpace(c.Vercel.ProjectID) != "" || strings.TrimSpace(c.Vercel.TeamID) != "" {
 		m["vercel"] = NormalizeVercelConfig(c.Vercel)
 	}
@@ -149,6 +152,10 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal(v, &c.Prompt); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
+		case "response_replacements":
+			if err := json.Unmarshal(v, &c.ResponseReplacements); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "vercel":
 			if err := json.Unmarshal(v, &c.Vercel); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
@@ -192,11 +199,12 @@ func (c Config) Clone() Config {
 			Enabled: cloneBoolPtr(c.ThinkingInjection.Enabled),
 			Prompt:  c.ThinkingInjection.Prompt,
 		},
-		Prompt: clonePromptConfig(c.Prompt),
-		Vercel:           c.Vercel,
-		VercelSyncHash:   c.VercelSyncHash,
-		VercelSyncTime:   c.VercelSyncTime,
-		AdditionalFields: map[string]any{},
+		Prompt:               clonePromptConfig(c.Prompt),
+		ResponseReplacements: cloneResponseReplacementsConfig(c.ResponseReplacements),
+		Vercel:               c.Vercel,
+		VercelSyncHash:       c.VercelSyncHash,
+		VercelSyncTime:       c.VercelSyncTime,
+		AdditionalFields:     map[string]any{},
 	}
 	for k, v := range c.AdditionalFields {
 		clone.AdditionalFields[k] = v
@@ -233,6 +241,13 @@ func cloneTextBlockConfig(in *TextBlockConfig) *TextBlockConfig {
 	return &TextBlockConfig{
 		Enabled: cloneBoolPtr(in.Enabled),
 		Text:    in.Text,
+	}
+}
+
+func cloneResponseReplacementsConfig(in ResponseReplacementsConfig) ResponseReplacementsConfig {
+	return ResponseReplacementsConfig{
+		Enabled: cloneBoolPtr(in.Enabled),
+		Rules:   slices.Clone(in.Rules),
 	}
 }
 
