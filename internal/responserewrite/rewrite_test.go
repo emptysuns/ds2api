@@ -22,6 +22,13 @@ func TestApplySkipsEmptyFrom(t *testing.T) {
 	}
 }
 
+func TestApplyPreservesNonEmptyFromWhitespace(t *testing.T) {
+	rules := []config.ResponseReplacementRule{{From: " a ", To: "x"}}
+	if got := Apply("a a ", rules); got != "ax" {
+		t.Fatalf("Apply()=%q want=ax", got)
+	}
+}
+
 func TestStreamReplacerHandlesBoundarySplit(t *testing.T) {
 	r := NewStreamReplacer([]config.ResponseReplacementRule{{From: "<|DEML", To: "<|DSML"}})
 	parts := []string{
