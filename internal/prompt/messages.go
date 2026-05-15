@@ -22,16 +22,38 @@ var OutputIntegrityGuardText = ""
 // wrap messages. When false, messages are concatenated raw without markers.
 var SentinelEnabled = true
 
-var (
-	SentinelBeginSentence    = "<|begin▁of▁sentence|>"
-	SentinelSystem           = "<|System|>"
-	SentinelUser             = "<|User|>"
-	SentinelAssistant        = "<|Assistant|>"
-	SentinelTool             = "<|Tool|>"
-	SentinelEndSentence      = "<|end▁of▁sentence|>"
-	SentinelEndToolResults   = "<|end▁of▁toolresults|>"
-	SentinelEndInstructions  = "<|end▁of▁instructions|>"
+const (
+	DefaultSentinelBeginSentence    = "<|begin▁of▁sentence|>"
+	DefaultSentinelSystem           = "<|System|>"
+	DefaultSentinelUser             = "<|User|>"
+	DefaultSentinelAssistant        = "<|Assistant|>"
+	DefaultSentinelTool             = "<|Tool|>"
+	DefaultSentinelEndSentence      = "<|end▁of▁sentence|>"
+	DefaultSentinelEndToolResults   = "<|end▁of▁toolresults|>"
+	DefaultSentinelEndInstructions  = "<|end▁of▁instructions|>"
 )
+
+var (
+	SentinelBeginSentence    = DefaultSentinelBeginSentence
+	SentinelSystem           = DefaultSentinelSystem
+	SentinelUser             = DefaultSentinelUser
+	SentinelAssistant        = DefaultSentinelAssistant
+	SentinelTool             = DefaultSentinelTool
+	SentinelEndSentence      = DefaultSentinelEndSentence
+	SentinelEndToolResults   = DefaultSentinelEndToolResults
+	SentinelEndInstructions  = DefaultSentinelEndInstructions
+)
+
+func ResetSentinelDefaults() {
+	SentinelBeginSentence = DefaultSentinelBeginSentence
+	SentinelSystem = DefaultSentinelSystem
+	SentinelUser = DefaultSentinelUser
+	SentinelAssistant = DefaultSentinelAssistant
+	SentinelTool = DefaultSentinelTool
+	SentinelEndSentence = DefaultSentinelEndSentence
+	SentinelEndToolResults = DefaultSentinelEndToolResults
+	SentinelEndInstructions = DefaultSentinelEndInstructions
+}
 
 const (
 	outputIntegrityGuardMarker = "Output integrity guard:"

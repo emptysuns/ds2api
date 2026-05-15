@@ -48,6 +48,9 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if c.ThinkingInjection.Enabled != nil || strings.TrimSpace(c.ThinkingInjection.Prompt) != "" {
 		m["thinking_injection"] = c.ThinkingInjection
 	}
+	if hasPromptConfig(c.Prompt) {
+		m["prompt"] = c.Prompt
+	}
 	if strings.TrimSpace(c.Vercel.Token) != "" || strings.TrimSpace(c.Vercel.ProjectID) != "" || strings.TrimSpace(c.Vercel.TeamID) != "" {
 		m["vercel"] = NormalizeVercelConfig(c.Vercel)
 	}
@@ -58,6 +61,20 @@ func (c Config) MarshalJSON() ([]byte, error) {
 		m["_vercel_sync_time"] = c.VercelSyncTime
 	}
 	return json.Marshal(m)
+}
+
+func hasPromptConfig(p PromptConfig) bool {
+	if p.OutputIntegrityGuard != nil || strings.TrimSpace(p.OutputIntegrityGuardText) != "" || p.Sentinels != nil {
+		return true
+	}
+	return hasTextBlockConfig(p.ToolCallInstructions) || hasTextBlockConfig(p.ReadToolCacheGuard) || hasTextBlockConfig(p.EmptyOutputRetrySuffix)
+}
+
+func hasTextBlockConfig(c *TextBlockConfig) bool {
+	if c == nil {
+		return false
+	}
+	return c.Enabled != nil || strings.TrimSpace(c.Text) != ""
 }
 
 func (c *Config) UnmarshalJSON(b []byte) error {
@@ -128,6 +145,10 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal(v, &c.ThinkingInjection); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
+		case "prompt":
+			if err := json.Unmarshal(v, &c.Prompt); err != nil {
+				return fmt.Errorf("invalid field %q: %w", k, err)
+			}
 		case "vercel":
 			if err := json.Unmarshal(v, &c.Vercel); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
@@ -171,6 +192,7 @@ func (c Config) Clone() Config {
 			Enabled: cloneBoolPtr(c.ThinkingInjection.Enabled),
 			Prompt:  c.ThinkingInjection.Prompt,
 		},
+		Prompt: clonePromptConfig(c.Prompt),
 		Vercel:           c.Vercel,
 		VercelSyncHash:   c.VercelSyncHash,
 		VercelSyncTime:   c.VercelSyncTime,
@@ -180,6 +202,38 @@ func (c Config) Clone() Config {
 		clone.AdditionalFields[k] = v
 	}
 	return clone
+}
+
+func clonePromptConfig(in PromptConfig) PromptConfig {
+	out := PromptConfig{
+		OutputIntegrityGuard:     cloneBoolPtr(in.OutputIntegrityGuard),
+		OutputIntegrityGuardText: in.OutputIntegrityGuardText,
+	}
+	if in.Sentinels != nil {
+		v := *in.Sentinels
+		v.Enabled = cloneBoolPtr(in.Sentinels.Enabled)
+		out.Sentinels = &v
+	}
+	if in.ToolCallInstructions != nil {
+		out.ToolCallInstructions = cloneTextBlockConfig(in.ToolCallInstructions)
+	}
+	if in.ReadToolCacheGuard != nil {
+		out.ReadToolCacheGuard = cloneTextBlockConfig(in.ReadToolCacheGuard)
+	}
+	if in.EmptyOutputRetrySuffix != nil {
+		out.EmptyOutputRetrySuffix = cloneTextBlockConfig(in.EmptyOutputRetrySuffix)
+	}
+	return out
+}
+
+func cloneTextBlockConfig(in *TextBlockConfig) *TextBlockConfig {
+	if in == nil {
+		return nil
+	}
+	return &TextBlockConfig{
+		Enabled: cloneBoolPtr(in.Enabled),
+		Text:    in.Text,
+	}
 }
 
 func cloneStringMap(in map[string]string) map[string]string {

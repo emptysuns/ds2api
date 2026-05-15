@@ -281,6 +281,25 @@ func TestUpdateSettingsIgnoresHistorySplitPayload(t *testing.T) {
 	}
 }
 
+func TestUpdateSettingsPersistsPromptGuardText(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"]}`)
+	payload := map[string]any{
+		"prompt": map[string]any{
+			"output_integrity_guard_text": " custom guard ",
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := h.Store.Snapshot().Prompt.OutputIntegrityGuardText; got != "custom guard" {
+		t.Fatalf("expected custom guard text to persist, got %q", got)
+	}
+}
+
 func TestUpdateSettingsThinkingInjection(t *testing.T) {
 	h := newAdminTestHandler(t, `{"keys":["k1"]}`)
 	payload := map[string]any{

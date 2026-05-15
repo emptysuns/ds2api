@@ -38,6 +38,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	thinkingInjectionEnabledSet := hasNestedSettingsKey(req, "thinking_injection", "enabled")
 	thinkingInjectionPromptSet := hasNestedSettingsKey(req, "thinking_injection", "prompt")
 	promptOutputIntegrityGuardSet := hasNestedSettingsKey(req, "prompt", "output_integrity_guard")
+	promptOutputIntegrityGuardTextSet := hasNestedSettingsKey(req, "prompt", "output_integrity_guard_text")
 	promptSentinelsSet := hasNestedSettingsKey(req, "prompt", "sentinels")
 	promptToolInstrSet := hasNestedSettingsKey(req, "prompt", "tool_call_instructions")
 	promptReadCacheSet := hasNestedSettingsKey(req, "prompt", "read_tool_cache_guard")
@@ -92,6 +93,9 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		if promptCfg != nil {
 			if promptOutputIntegrityGuardSet {
 				c.Prompt.OutputIntegrityGuard = promptCfg.OutputIntegrityGuard
+			}
+			if promptOutputIntegrityGuardTextSet {
+				c.Prompt.OutputIntegrityGuardText = promptCfg.OutputIntegrityGuardText
 			}
 			if promptSentinelsSet {
 				c.Prompt.Sentinels = promptCfg.Sentinels
@@ -205,6 +209,7 @@ func (h *Handler) applyPromptConfig() {
 	prompt.OutputIntegrityGuardText = h.Store.OutputIntegrityGuardText()
 
 	prompt.SentinelEnabled = h.Store.SentinelsEnabled()
+	prompt.ResetSentinelDefaults()
 	overrides := h.Store.SentinelOverrides()
 	if overrides.BeginSentence != "" {
 		prompt.SentinelBeginSentence = overrides.BeginSentence

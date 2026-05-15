@@ -221,6 +221,69 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	}
 }
 
+func TestConfigJSONRoundtripPreservesPromptConfig(t *testing.T) {
+	guardEnabled := false
+	sentinelsEnabled := true
+	toolInstructionsEnabled := false
+	readGuardEnabled := false
+	emptyRetryEnabled := false
+	cfg := Config{
+		Keys: []string{"k1"},
+		Prompt: PromptConfig{
+			OutputIntegrityGuard:     &guardEnabled,
+			OutputIntegrityGuardText: "custom guard",
+			Sentinels: &SentinelConfig{
+				Enabled: &sentinelsEnabled,
+				System:  "<SYS>",
+				User:    "<USR>",
+			},
+			ToolCallInstructions: &TextBlockConfig{
+				Enabled: &toolInstructionsEnabled,
+				Text:    "custom tool instructions",
+			},
+			ReadToolCacheGuard: &TextBlockConfig{
+				Enabled: &readGuardEnabled,
+				Text:    "custom read guard",
+			},
+			EmptyOutputRetrySuffix: &TextBlockConfig{
+				Enabled: &emptyRetryEnabled,
+				Text:    "custom retry suffix",
+			},
+		},
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	if !strings.Contains(string(data), `"prompt"`) {
+		t.Fatalf("expected prompt field to marshal, got %s", data)
+	}
+
+	var decoded Config
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if decoded.Prompt.OutputIntegrityGuard == nil || *decoded.Prompt.OutputIntegrityGuard {
+		t.Fatalf("expected output_integrity_guard=false, got %#v", decoded.Prompt.OutputIntegrityGuard)
+	}
+	if decoded.Prompt.OutputIntegrityGuardText != "custom guard" {
+		t.Fatalf("unexpected guard text: %q", decoded.Prompt.OutputIntegrityGuardText)
+	}
+	if decoded.Prompt.Sentinels == nil || decoded.Prompt.Sentinels.System != "<SYS>" || decoded.Prompt.Sentinels.User != "<USR>" {
+		t.Fatalf("unexpected sentinel config: %#v", decoded.Prompt.Sentinels)
+	}
+	if decoded.Prompt.ToolCallInstructions == nil || decoded.Prompt.ToolCallInstructions.Text != "custom tool instructions" {
+		t.Fatalf("unexpected tool instructions config: %#v", decoded.Prompt.ToolCallInstructions)
+	}
+	if decoded.Prompt.ReadToolCacheGuard == nil || decoded.Prompt.ReadToolCacheGuard.Text != "custom read guard" {
+		t.Fatalf("unexpected read cache guard config: %#v", decoded.Prompt.ReadToolCacheGuard)
+	}
+	if decoded.Prompt.EmptyOutputRetrySuffix == nil || decoded.Prompt.EmptyOutputRetrySuffix.Text != "custom retry suffix" {
+		t.Fatalf("unexpected empty retry suffix config: %#v", decoded.Prompt.EmptyOutputRetrySuffix)
+	}
+}
+
 func TestAutoDeleteModeResolution(t *testing.T) {
 	tests := []struct {
 		name string

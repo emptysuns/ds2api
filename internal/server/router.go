@@ -420,6 +420,7 @@ func applyPromptConfigFromStore(store *config.Store) {
 	prompt.OutputIntegrityGuardText = store.OutputIntegrityGuardText()
 
 	prompt.SentinelEnabled = store.SentinelsEnabled()
+	prompt.ResetSentinelDefaults()
 	overrides := store.SentinelOverrides()
 	if overrides.BeginSentence != "" {
 		prompt.SentinelBeginSentence = overrides.BeginSentence
