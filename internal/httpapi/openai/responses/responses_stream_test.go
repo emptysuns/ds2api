@@ -151,6 +151,64 @@ func TestHandleResponsesStreamCoalescesSmallOutputTextDeltas(t *testing.T) {
 	}
 }
 
+func TestPrepareResponsesStreamRuntimeBuffersToolSyntaxWithoutDeclaredTools(t *testing.T) {
+	h := &Handler{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	_ = req
+	rec := httptest.NewRecorder()
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("data: [DONE]\n")),
+	}
+
+	runtime, _, ok := h.prepareResponsesStreamRuntime(rec, resp, "owner-a", "resp_policy", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
+	if !ok {
+		t.Fatalf("expected runtime preparation to succeed")
+	}
+	if !runtime.bufferToolContent {
+		t.Fatalf("expected Responses retry runtime to buffer tool syntax for default tool_choice without declared tools")
+	}
+}
+
+func TestHandleResponsesStreamWithRetryDoesNotLeakToolTextWithoutDeclaredTools(t *testing.T) {
+	h := &Handler{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	rec := httptest.NewRecorder()
+
+	sseLine := func(v string) string {
+		b, _ := json.Marshal(map[string]any{
+			"p": "response/content",
+			"v": v,
+		})
+		return "data: " + string(b) + "\n"
+	}
+
+	streamBody := sseLine("<|DSML|tool_calls>\n<|DSML|invoke name=\"mcp__exa__web_search_exa\">\n<|DSML|parameter name=\"query\"><![CDATA[Donald Trump latest news 2026-05-16]]></|DSML|parameter>\n<|DSML|parameter name=\"numResults\"><![CDATA[8]]></|DSML|parameter>\n</|DSML|invoke>\n</|DSML|tool_calls>") +
+		"data: [DONE]\n"
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(streamBody)),
+	}
+
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, map[string]any{"prompt": "prompt"}, "pow", "owner-a", "resp_retry_leak", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
+
+	body := rec.Body.String()
+	textPayloads := extractSSEEventPayloads(body, "response.output_text.delta")
+	var text strings.Builder
+	for _, payload := range textPayloads {
+		text.WriteString(asString(payload["delta"]))
+	}
+	if leaked := text.String(); strings.Contains(strings.ToLower(leaked), "dsml") || strings.Contains(leaked, "mcp__exa__web_search_exa") || strings.Contains(leaked, "tool_") {
+		t.Fatalf("tool markup leaked to responses stream text: %q body=%s", leaked, body)
+	}
+	if len(extractSSEEventPayloads(body, "response.output_item.done")) == 0 || !strings.Contains(body, "mcp__exa__web_search_exa") {
+		t.Fatalf("expected function call events for DSML tool call, body=%s", body)
+	}
+	if !strings.Contains(body, "event: response.completed") {
+		t.Fatalf("expected completed event, body=%s", body)
+	}
+}
+
 func TestHandleResponsesStreamEmitsDistinctToolCallIDsAcrossSeparateToolBlocks(t *testing.T) {
 	h := &Handler{}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)

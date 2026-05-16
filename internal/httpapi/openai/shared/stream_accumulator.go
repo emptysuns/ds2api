@@ -11,6 +11,7 @@ type StreamAccumulator struct {
 	ThinkingEnabled       bool
 	SearchEnabled         bool
 	StripReferenceMarkers bool
+	PreserveToolMarkup    bool
 
 	ResponseReplacer *responserewrite.StreamReplacer
 
@@ -72,7 +73,7 @@ func (a *StreamAccumulator) applyThinkingPart(text string) StreamPartDelta {
 	if !a.ThinkingEnabled || rawTrimmed == "" {
 		return delta
 	}
-	cleanedText := CleanVisibleOutput(rawTrimmed, a.StripReferenceMarkers)
+	cleanedText := CleanVisibleOutputWithPolicy(rawTrimmed, a.StripReferenceMarkers, a.PreserveToolMarkup)
 	if cleanedText == "" {
 		return delta
 	}
@@ -101,7 +102,7 @@ func (a *StreamAccumulator) applyTextPart(text string) StreamPartDelta {
 		delta.CitationOnly = true
 		return delta
 	}
-	cleanedText := CleanVisibleOutput(rawTrimmed, a.StripReferenceMarkers)
+	cleanedText := CleanVisibleOutputWithPolicy(rawTrimmed, a.StripReferenceMarkers, a.PreserveToolMarkup)
 	trimmed := sse.TrimContinuationOverlapFromBuilder(&a.Text, cleanedText)
 	if trimmed == "" {
 		return delta
@@ -133,7 +134,7 @@ func (a *StreamAccumulator) FlushResponseReplacements() StreamPartDelta {
 		return StreamPartDelta{Type: "text"}
 	}
 	a.RawText.WriteString(flushed)
-	cleanedText := CleanVisibleOutput(flushed, a.StripReferenceMarkers)
+	cleanedText := CleanVisibleOutputWithPolicy(flushed, a.StripReferenceMarkers, a.PreserveToolMarkup)
 	trimmed := sse.TrimContinuationOverlapFromBuilder(&a.Text, cleanedText)
 	delta := StreamPartDelta{Type: "text", RawText: flushed}
 	if trimmed != "" {

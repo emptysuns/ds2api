@@ -195,7 +195,7 @@ func (h *Handler) handleNonStream(w http.ResponseWriter, resp *http.Response, co
 	writeJSON(w, http.StatusOK, respBody)
 }
 
-func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *http.Response, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySession *chatHistorySession) {
+func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *http.Response, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, historySession *chatHistorySession) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -216,7 +216,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	}
 
 	created := time.Now().Unix()
-	bufferToolContent := len(toolNames) > 0
+	bufferToolContent := !toolChoice.IsNone()
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
 	stripReferenceMarkers := stripReferenceMarkersEnabled()
 	initialType := "text"
@@ -237,7 +237,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		stripReferenceMarkers,
 		toolNames,
 		toolsRaw,
-		promptcompat.DefaultToolChoicePolicy(),
+		toolChoice,
 		bufferToolContent,
 		emitEarlyToolDeltas,
 		responserewrite.NewStreamReplacer(h.responseReplacementRules()),

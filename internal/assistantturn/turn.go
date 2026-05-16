@@ -91,15 +91,19 @@ type StreamSnapshot struct {
 }
 
 func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
-	thinking := shared.CleanVisibleOutput(result.Thinking, opts.StripReferenceMarkers)
-	text := shared.CleanVisibleOutput(result.Text, opts.StripReferenceMarkers)
+	thinking := shared.CleanVisibleOutputWithPolicy(result.Thinking, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
+	text := shared.CleanVisibleOutputWithPolicy(result.Text, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
 	if opts.SearchEnabled {
 		text = shared.ReplaceCitationMarkersWithLinks(text, result.CitationLinks)
 	}
 
-	parsed := shared.DetectAssistantToolCalls(result.Text, text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
-	calls := toolcall.NormalizeParsedToolCallsForSchemas(parsed.Calls, opts.ToolsRaw)
-	parsed.Calls = calls
+	parsed := toolcall.ToolCallParseResult{}
+	var calls []toolcall.ParsedToolCall
+	if !opts.ToolChoice.IsNone() {
+		parsed = shared.DetectAssistantToolCalls(result.Text, text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
+		calls = toolcall.NormalizeParsedToolCallsForSchemas(parsed.Calls, opts.ToolsRaw)
+		parsed.Calls = calls
+	}
 
 	stopReason := StopReasonStop
 	if result.ContentFilter {
@@ -133,19 +137,23 @@ func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
 }
 
 func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Turn {
-	thinking := shared.CleanVisibleOutput(snapshot.VisibleThinking, opts.StripReferenceMarkers)
-	text := shared.CleanVisibleOutput(snapshot.VisibleText, opts.StripReferenceMarkers)
+	thinking := shared.CleanVisibleOutputWithPolicy(snapshot.VisibleThinking, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
+	text := shared.CleanVisibleOutputWithPolicy(snapshot.VisibleText, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
 	if opts.SearchEnabled {
 		text = shared.ReplaceCitationMarkersWithLinks(text, snapshot.CitationLinks)
 	}
 
-	parsed := shared.DetectAssistantToolCalls(snapshot.RawText, text, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
-	calls := parsed.Calls
-	if len(calls) == 0 && len(snapshot.AdditionalToolCalls) > 0 {
-		calls = snapshot.AdditionalToolCalls
+	parsed := toolcall.ToolCallParseResult{}
+	var calls []toolcall.ParsedToolCall
+	if !opts.ToolChoice.IsNone() {
+		parsed = shared.DetectAssistantToolCalls(snapshot.RawText, text, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
+		calls = parsed.Calls
+		if len(calls) == 0 && len(snapshot.AdditionalToolCalls) > 0 {
+			calls = snapshot.AdditionalToolCalls
+		}
+		calls = toolcall.NormalizeParsedToolCallsForSchemas(calls, opts.ToolsRaw)
+		parsed.Calls = calls
 	}
-	calls = toolcall.NormalizeParsedToolCallsForSchemas(calls, opts.ToolsRaw)
-	parsed.Calls = calls
 
 	stopReason := StopReasonStop
 	if snapshot.ContentFilter {

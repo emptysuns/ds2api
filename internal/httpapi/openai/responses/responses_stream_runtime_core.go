@@ -10,8 +10,8 @@ import (
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/responsehistory"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolstream"
@@ -118,6 +118,7 @@ func newResponsesStreamRuntime(
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
+			PreserveToolMarkup:    toolChoice.IsNone(),
 			ResponseReplacer:      responseReplacer,
 		},
 	}

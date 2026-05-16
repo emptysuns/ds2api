@@ -46,7 +46,7 @@ var leakedAgentWrapperPlusResultOpenPattern = regexp.MustCompile(`(?is)<(?:attem
 var leakedAgentResultPlusWrapperClosePattern = regexp.MustCompile(`(?is)</result>\s*</(?:attempt_completion|ask_followup_question|new_task)\b[^>]*>`)
 var leakedAgentResultTagPattern = regexp.MustCompile(`(?is)</?result>`)
 
-func sanitizeLeakedOutput(text string) string {
+func sanitizeLeakedOutput(text string, preserveToolMarkup bool) string {
 	if text == "" {
 		return text
 	}
@@ -58,7 +58,9 @@ func sanitizeLeakedOutput(text string) string {
 	out = leakedBOSMarkerPattern.ReplaceAllString(out, "")
 	out = leakedThoughtMarkerPattern.ReplaceAllString(out, "")
 	out = leakedMetaMarkerPattern.ReplaceAllString(out, "")
-	out = stripLeakedToolCallWrapperBlocks(out)
+	if !preserveToolMarkup {
+		out = stripLeakedToolCallWrapperBlocks(out)
+	}
 	out = sanitizeLeakedAgentXMLBlocks(out)
 	return out
 }

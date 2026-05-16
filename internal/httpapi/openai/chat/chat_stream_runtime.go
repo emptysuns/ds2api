@@ -122,6 +122,7 @@ func newChatStreamRuntime(
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
+			PreserveToolMarkup:    toolChoice.IsNone(),
 			ResponseReplacer:      responseReplacer,
 		},
 	}
