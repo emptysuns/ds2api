@@ -17,10 +17,11 @@ import (
 	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
+	"ds2api/internal/toolpolicy"
 )
 
 //nolint:unused // retained for native Gemini stream handling path.
-func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Request, resp *http.Response, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySessions ...*responsehistory.Session) {
+func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Request, resp *http.Response, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, historySessions ...*responsehistory.Session) {
 	var historySession *responsehistory.Session
 	if len(historySessions) > 0 {
 		historySession = historySessions[0]
@@ -42,7 +43,7 @@ func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Req
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolChoice, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
 
 	initialType := "text"
 	if thinkingEnabled {
@@ -79,6 +80,7 @@ type geminiStreamRuntime struct {
 	stripReferenceMarkers bool
 	toolNames             []string
 	toolsRaw              any
+	toolChoice            promptcompat.ToolChoicePolicy
 
 	accumulator       *assistantturn.Accumulator
 	responseReplacer  *responserewrite.StreamReplacer
@@ -90,7 +92,7 @@ type geminiStreamRuntime struct {
 	history           *responsehistory.Session
 }
 
-func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow string, stdReq promptcompat.StandardRequest, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySession *responsehistory.Session) {
+func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow string, stdReq promptcompat.StandardRequest, model, finalPrompt string, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, historySession *responsehistory.Session) {
 	if resp.StatusCode != http.StatusOK {
 		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(resp.Body)
@@ -108,7 +110,7 @@ func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r 
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolChoice, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
 		Surface:              "gemini.generate_content",
@@ -176,6 +178,7 @@ func newGeminiStreamRuntime(
 	stripReferenceMarkers bool,
 	toolNames []string,
 	toolsRaw any,
+	toolChoice promptcompat.ToolChoicePolicy,
 	history *responsehistory.Session,
 	responseReplacer *responserewrite.StreamReplacer,
 ) *geminiStreamRuntime {
@@ -187,10 +190,11 @@ func newGeminiStreamRuntime(
 		finalPrompt:           finalPrompt,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
-		bufferContent:         len(toolNames) > 0,
+		bufferContent:         toolpolicy.ShouldBufferToolContent(toolChoice),
 		stripReferenceMarkers: stripReferenceMarkers,
 		toolNames:             toolNames,
 		toolsRaw:              toolsRaw,
+		toolChoice:            toolChoice,
 		history:               history,
 		responseReplacer:      responseReplacer,
 		accumulator: assistantturn.NewAccumulator(assistantturn.AccumulatorOptions{
@@ -277,7 +281,11 @@ func (s *geminiStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 			})
 			continue
 		}
-		if p.RawText == "" || p.CitationOnly || p.VisibleText == "" {
+		visibleText := p.VisibleText
+		if !toolpolicy.ShouldParseToolCalls(s.toolChoice) {
+			visibleText = p.RawText
+		}
+		if p.RawText == "" || p.CitationOnly || visibleText == "" {
 			continue
 		}
 		if s.bufferContent {
@@ -289,7 +297,7 @@ func (s *geminiStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 					"index": 0,
 					"content": map[string]any{
 						"role":  "model",
-						"parts": []map[string]any{{"text": p.VisibleText}},
+						"parts": []map[string]any{{"text": visibleText}},
 					},
 				},
 			},
@@ -313,11 +321,17 @@ func (s *geminiStreamRuntime) finalize(deferEmptyOutput bool) bool {
 		s.accumulator.FlushResponseReplacements()
 	}
 	rawText, text, rawThinking, thinking, detectionThinking := s.accumulator.Snapshot()
+	visibleText := text
+	visibleThinking := thinking
+	if !toolpolicy.ShouldParseToolCalls(s.toolChoice) {
+		visibleText = rawText
+		visibleThinking = rawThinking
+	}
 	turn := assistantturn.BuildTurnFromStreamSnapshot(assistantturn.StreamSnapshot{
 		RawText:           rawText,
-		VisibleText:       text,
+		VisibleText:       visibleText,
 		RawThinking:       rawThinking,
-		VisibleThinking:   thinking,
+		VisibleThinking:   visibleThinking,
 		DetectionThinking: detectionThinking,
 		ContentFilter:     s.contentFilter,
 		ResponseMessageID: s.responseMessageID,
@@ -328,6 +342,7 @@ func (s *geminiStreamRuntime) finalize(deferEmptyOutput bool) bool {
 		StripReferenceMarkers: s.stripReferenceMarkers,
 		ToolNames:             s.toolNames,
 		ToolsRaw:              s.toolsRaw,
+		ToolChoice:            s.toolChoice,
 	})
 	outcome := assistantturn.FinalizeTurn(turn, assistantturn.FinalizeOptions{})
 	if outcome.ShouldFail {

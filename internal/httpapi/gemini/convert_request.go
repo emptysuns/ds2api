@@ -48,6 +48,7 @@ func normalizeGeminiRequest(store ConfigReader, routeModel string, req map[strin
 		ToolsRaw:        toolsRaw,
 		FinalPrompt:     finalPrompt,
 		ToolNames:       toolNames,
+		ToolChoice:      promptcompat.DefaultToolChoicePolicy(),
 		Stream:          stream,
 		Thinking:        thinkingEnabled,
 		Search:          searchEnabled,

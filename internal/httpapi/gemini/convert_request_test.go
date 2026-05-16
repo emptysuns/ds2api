@@ -1,6 +1,29 @@
 package gemini
 
-import "testing"
+import (
+	"testing"
+
+	"ds2api/internal/promptcompat"
+)
+
+func TestNormalizeGeminiRequestSetsDefaultToolChoicePolicy(t *testing.T) {
+	req := map[string]any{
+		"contents": []any{
+			map[string]any{
+				"role":  "user",
+				"parts": []any{map[string]any{"text": "hello"}},
+			},
+		},
+	}
+	out, err := normalizeGeminiRequest(testGeminiConfig{}, "gemini-2.5-pro", req, false)
+	if err != nil {
+		t.Fatalf("normalizeGeminiRequest error: %v", err)
+	}
+	want := promptcompat.DefaultToolChoicePolicy()
+	if out.ToolChoice.Mode != want.Mode {
+		t.Fatalf("expected default tool choice mode %q, got %q", want.Mode, out.ToolChoice.Mode)
+	}
+}
 
 func TestNormalizeGeminiRequestNoThinkingModelForcesThinkingOff(t *testing.T) {
 	req := map[string]any{

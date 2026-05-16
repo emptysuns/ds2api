@@ -22,10 +22,10 @@ import (
 
 type testGeminiConfig struct{}
 
-func (testGeminiConfig) ModelAliases() map[string]string { return nil }
-func (testGeminiConfig) CurrentInputFileEnabled() bool   { return true }
-func (testGeminiConfig) CurrentInputFileMinChars() int   { return 0 }
-func (testGeminiConfig) ResponseReplacementsEnabled() bool                    { return false }
+func (testGeminiConfig) ModelAliases() map[string]string                            { return nil }
+func (testGeminiConfig) CurrentInputFileEnabled() bool                              { return true }
+func (testGeminiConfig) CurrentInputFileMinChars() int                              { return 0 }
+func (testGeminiConfig) ResponseReplacementsEnabled() bool                          { return false }
 func (testGeminiConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 
 type testGeminiAuth struct {
@@ -48,7 +48,7 @@ func (m testGeminiAuth) Determine(_ *http.Request) (*auth.RequestAuth, error) {
 	}, nil
 }
 
-func (m testGeminiAuth) ResponseReplacementsEnabled() bool { return false }
+func (m testGeminiAuth) ResponseReplacementsEnabled() bool                          { return false }
 func (m testGeminiAuth) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
 
 func (testGeminiAuth) Release(_ *auth.RequestAuth) {}
@@ -407,7 +407,7 @@ func TestNativeStreamGenerateContentEmitsThoughtParts(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", nil)
 
-	h.handleStreamGenerateContent(rec, req, resp, "gemini-2.5-pro", "prompt", true, false, nil, nil)
+	h.handleStreamGenerateContent(rec, req, resp, "gemini-2.5-pro", "prompt", true, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := extractGeminiSSEFrames(t, rec.Body.String())
 	if len(frames) < 2 {
@@ -428,6 +428,63 @@ func TestNativeStreamGenerateContentEmitsThoughtParts(t *testing.T) {
 	}
 	if !strings.Contains(gotText, "answer") {
 		t.Fatalf("expected text part answer, got %q body=%s", gotText, rec.Body.String())
+	}
+}
+
+func TestNativeStreamGenerateContentDetectsToolUseWithoutDeclaredTools(t *testing.T) {
+	h := &Handler{}
+	resp := makeGeminiUpstreamResponse(
+		`data: {"p":"response/content","v":"<|DSML|tool_calls>\n  <|DSML|invoke name=\"Bash\">\n    <|DSML|parameter name=\"command\"><![CDATA[pwd]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", nil)
+
+	h.handleStreamGenerateContent(rec, req, resp, "gemini-2.5-pro", "prompt", false, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
+
+	frames := extractGeminiSSEFrames(t, rec.Body.String())
+	var text string
+	var sawBash bool
+	for _, frame := range frames {
+		for _, part := range geminiPartsFromFrame(frame) {
+			text += asString(part["text"])
+			functionCall, _ := part["functionCall"].(map[string]any)
+			if functionCall["name"] == "Bash" {
+				sawBash = true
+			}
+		}
+	}
+	if strings.Contains(text, "DSML|tool_calls") || strings.Contains(text, "DSML|invoke") {
+		t.Fatalf("expected no visible DSML/tool markup leak, got text=%q body=%s", text, rec.Body.String())
+	}
+	if !sawBash {
+		t.Fatalf("expected functionCall part named Bash, body=%s", rec.Body.String())
+	}
+}
+
+func TestNativeStreamGenerateContentHonorsExplicitToolChoiceNone(t *testing.T) {
+	h := &Handler{}
+	resp := makeGeminiUpstreamResponse(
+		`data: {"p":"response/content","v":"<|DSML|tool_calls>\n  <|DSML|invoke name=\"Bash\">\n    <|DSML|parameter name=\"command\"><![CDATA[pwd]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", nil)
+
+	h.handleStreamGenerateContent(rec, req, resp, "gemini-2.5-pro", "prompt", false, false, nil, nil, promptcompat.ToolChoicePolicy{Mode: promptcompat.ToolChoiceNone})
+
+	frames := extractGeminiSSEFrames(t, rec.Body.String())
+	var text string
+	for _, frame := range frames {
+		for _, part := range geminiPartsFromFrame(frame) {
+			text += asString(part["text"])
+			if _, ok := part["functionCall"]; ok {
+				t.Fatalf("expected no functionCall parts when tool choice is none, got part=%#v body=%s", part, rec.Body.String())
+			}
+		}
+	}
+	if !strings.Contains(text, "DSML|tool_calls") {
+		t.Fatalf("expected raw tool markup to remain visible, got text=%q body=%s", text, rec.Body.String())
 	}
 }
 
