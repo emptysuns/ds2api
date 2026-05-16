@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ds2api/internal/promptcompat"
 )
 
 type claudeFrame struct {
@@ -104,7 +106,7 @@ func TestHandleClaudeStreamRealtimeTextIncrementsWithEventHeaders(t *testing.T) 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
 
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: message_start") {
@@ -146,7 +148,7 @@ func TestHandleClaudeStreamRealtimeToolBufferedPlainTextDoesNotRepeatFinalText(t
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"Bash"}, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"Bash"}, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	if got := collectClaudeTextDeltas(frames); got != want {
@@ -165,7 +167,7 @@ func TestHandleClaudeStreamRealtimeTrimsContinuationReplay(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	combined := strings.Builder{}
@@ -191,7 +193,7 @@ func TestHandleClaudeStreamRealtimeThinkingDelta(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, true, false, nil, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	foundThinkingDelta := false
@@ -218,7 +220,7 @@ func TestHandleClaudeStreamRealtimeSkipsThinkingFallbackWhenFinalTextExists(t *t
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, true, false, []string{"search"}, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, true, false, []string{"search"}, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	for _, f := range findClaudeFrames(frames, "content_block_start") {
@@ -249,7 +251,7 @@ func TestHandleClaudeStreamRealtimeUpstreamErrorEvent(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	errFrames := findClaudeFrames(frames, "error")
@@ -286,7 +288,7 @@ func TestHandleClaudeStreamRealtimePingEvent(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	if len(findClaudeFrames(frames, "ping")) == 0 {
@@ -340,7 +342,7 @@ func TestHandleClaudeStreamRealtimeToolSafetyAcrossStructuredFormats(t *testing.
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-			h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"Bash"}, nil)
+			h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"Bash"}, nil, promptcompat.DefaultToolChoicePolicy())
 
 			frames := parseClaudeFrames(t, rec.Body.String())
 			foundToolUse := false
@@ -358,6 +360,57 @@ func TestHandleClaudeStreamRealtimeToolSafetyAcrossStructuredFormats(t *testing.
 	}
 }
 
+func TestHandleClaudeStreamRealtimeDetectsToolUseWithoutDeclaredTools(t *testing.T) {
+	h := &Handler{}
+	resp := makeClaudeSSEHTTPResponse(
+		`data: {"p":"response/content","v":"<tool_calls><invoke name=\"search\"><parameter name=\"q\">from-text</parameter></invoke></tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
+
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
+
+	frames := parseClaudeFrames(t, rec.Body.String())
+	foundToolUse := false
+	for _, f := range findClaudeFrames(frames, "content_block_start") {
+		contentBlock, _ := f.Payload["content_block"].(map[string]any)
+		if contentBlock["type"] == "tool_use" && contentBlock["name"] == "search" {
+			foundToolUse = true
+			break
+		}
+	}
+	if !foundToolUse {
+		t.Fatalf("expected tool_use block without declared tools, body=%s", rec.Body.String())
+	}
+	if leaked := collectClaudeTextDeltas(frames); strings.Contains(leaked, "tool_calls") || strings.Contains(leaked, "from-text") {
+		t.Fatalf("expected tool block to be hidden from text deltas, got %q body=%s", leaked, rec.Body.String())
+	}
+}
+
+func TestHandleClaudeStreamRealtimeHonorsExplicitToolChoiceNone(t *testing.T) {
+	h := &Handler{}
+	resp := makeClaudeSSEHTTPResponse(
+		`data: {"p":"response/content","v":"<tool_calls><invoke name=\"search\"><parameter name=\"q\">literal</parameter></invoke></tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
+
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "show literal"}}, false, false, []string{"search"}, nil, promptcompat.ToolChoicePolicy{Mode: promptcompat.ToolChoiceNone})
+
+	frames := parseClaudeFrames(t, rec.Body.String())
+	for _, f := range findClaudeFrames(frames, "content_block_start") {
+		contentBlock, _ := f.Payload["content_block"].(map[string]any)
+		if contentBlock["type"] == "tool_use" {
+			t.Fatalf("did not expect tool_use block when tool_choice is none, body=%s", rec.Body.String())
+		}
+	}
+	if got := collectClaudeTextDeltas(frames); !strings.Contains(got, "tool_calls") || !strings.Contains(got, "literal") {
+		t.Fatalf("expected literal tool markup in text deltas, got %q body=%s", got, rec.Body.String())
+	}
+}
+
 func TestHandleClaudeStreamRealtimeDetectsToolUseWithLeadingProse(t *testing.T) {
 	h := &Handler{}
 	payload := "I'll call a tool now.\\n<tool_calls><invoke name=\\\"write_file\\\"><parameter name=\\\"path\\\">/tmp/a.txt</parameter><parameter name=\\\"content\\\">abc</parameter></invoke></tool_calls>"
@@ -368,7 +421,7 @@ func TestHandleClaudeStreamRealtimeDetectsToolUseWithLeadingProse(t *testing.T) 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"write_file"}, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"write_file"}, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	foundToolUse := false
@@ -402,7 +455,7 @@ func TestHandleClaudeStreamRealtimeIgnoresUnclosedFencedToolExample(t *testing.T
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "show example only"}}, false, false, []string{"Bash"}, nil)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "show example only"}}, false, false, []string{"Bash"}, nil, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	foundToolUse := false
@@ -456,7 +509,7 @@ func TestHandleClaudeStreamRealtimeNormalizesToolInputBySchema(t *testing.T) {
 		},
 	}
 
-	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "write"}}, false, false, []string{"Write"}, toolsRaw)
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "write"}}, false, false, []string{"Write"}, toolsRaw, promptcompat.DefaultToolChoicePolicy())
 
 	frames := parseClaudeFrames(t, rec.Body.String())
 	for _, f := range findClaudeFrames(frames, "content_block_delta") {

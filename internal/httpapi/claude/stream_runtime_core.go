@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"ds2api/internal/responserewrite"
+	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolcall"
@@ -24,6 +25,7 @@ type claudeStreamRuntime struct {
 	messages        []any
 	toolsRaw        any
 	promptTokenText string
+	toolChoice      promptcompat.ToolChoicePolicy
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -65,6 +67,7 @@ func newClaudeStreamRuntime(
 	toolNames []string,
 	toolsRaw any,
 	promptTokenText string,
+	toolChoice promptcompat.ToolChoicePolicy,
 	history *responsehistory.Session,
 	responseReplacer *responserewrite.StreamReplacer,
 ) *claudeStreamRuntime {
@@ -76,11 +79,12 @@ func newClaudeStreamRuntime(
 		messages:              messages,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
-		bufferToolContent:     len(toolNames) > 0,
+		bufferToolContent:     !toolChoice.IsNone(),
 		stripReferenceMarkers: stripReferenceMarkers,
 		toolNames:             toolNames,
 		toolsRaw:              toolsRaw,
 		promptTokenText:       promptTokenText,
+		toolChoice:            toolChoice,
 		history:               history,
 		responseReplacer:      responseReplacer,
 		messageID:             fmt.Sprintf("msg_%d", time.Now().UnixNano()),
