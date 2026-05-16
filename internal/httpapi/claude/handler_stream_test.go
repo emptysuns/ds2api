@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
 )
 
@@ -385,6 +386,42 @@ func TestHandleClaudeStreamRealtimeDetectsToolUseWithoutDeclaredTools(t *testing
 	}
 	if leaked := collectClaudeTextDeltas(frames); strings.Contains(leaked, "tool_calls") || strings.Contains(leaked, "from-text") {
 		t.Fatalf("expected tool block to be hidden from text deltas, got %q body=%s", leaked, rec.Body.String())
+	}
+}
+
+func TestHandleClaudeStreamRealtimeDoesNotLeakToolTextWhenReplacementFlushCompletesToolCall(t *testing.T) {
+	h := &Handler{
+		Store: mockClaudeConfig{
+			responseReplacementsEnabled: true,
+			responseReplacementRules: []config.ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "</|DEML", To: "</|DSML"},
+			},
+		},
+	}
+	resp := makeClaudeSSEHTTPResponse(
+		`data: {"p":"response/content","v":"<|DEML|tool_calls>\n<|DEML|invoke name=\"mcp__exa__web_search_exa\">\n<|DEML|parameter name=\"query\"><![CDATA[Trump returns to US comment on China visit 2026]]></|DEML|parameter>\n<|DEML|parameter name=\"numResults\"><![CDATA[10]]></|DEML|parameter>\n</|DEML|invoke>\n</|DEML|tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
+
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "use tool"}}, false, false, []string{"mcp__exa__web_search_exa"}, nil, promptcompat.DefaultToolChoicePolicy())
+
+	frames := parseClaudeFrames(t, rec.Body.String())
+	foundToolUse := false
+	for _, f := range findClaudeFrames(frames, "content_block_start") {
+		contentBlock, _ := f.Payload["content_block"].(map[string]any)
+		if contentBlock["type"] == "tool_use" && contentBlock["name"] == "mcp__exa__web_search_exa" {
+			foundToolUse = true
+			break
+		}
+	}
+	if !foundToolUse {
+		t.Fatalf("expected tool_use block, body=%s", rec.Body.String())
+	}
+	if leaked := collectClaudeTextDeltas(frames); strings.Contains(strings.ToLower(leaked), "dsml") || strings.Contains(leaked, "mcp__exa__web_search_exa") || strings.Contains(leaked, "tool_") {
+		t.Fatalf("tool markup leaked to streamed text: %q body=%s", leaked, rec.Body.String())
 	}
 }
 

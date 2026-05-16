@@ -219,14 +219,57 @@ func (s *chatStreamRuntime) resetStreamToolCallState() {
 	s.streamToolNames = map[int]string{}
 }
 
+func (s *chatStreamRuntime) processToolStreamEvents(batch *chatDeltaBatch, events []toolstream.Event) {
+	for _, evt := range events {
+		if len(evt.ToolCallDeltas) > 0 {
+			if !s.emitEarlyToolDeltas {
+				continue
+			}
+			filtered := filterIncrementalToolCallDeltasByAllowed(evt.ToolCallDeltas, s.streamToolNames)
+			if len(filtered) == 0 {
+				continue
+			}
+			formatted := formatIncrementalStreamToolCallDeltas(filtered, s.streamToolCallIDs)
+			if len(formatted) == 0 {
+				continue
+			}
+			batch.flush()
+			s.toolCallsEmitted = true
+			s.sendDelta(map[string]any{"tool_calls": formatted})
+			continue
+		}
+		if len(evt.ToolCalls) > 0 {
+			batch.flush()
+			s.toolCallsEmitted = true
+			s.toolCallsDoneEmitted = true
+			s.sendDelta(map[string]any{
+				"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
+			})
+			s.resetStreamToolCallState()
+			continue
+		}
+		if evt.Content == "" {
+			continue
+		}
+		cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
+		if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
+			continue
+		}
+		batch.append("content", cleaned)
+	}
+}
+
 func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool) bool {
 	s.finalErrorStatus = 0
 	s.finalErrorMessage = ""
 	s.finalErrorCode = ""
-	// Flush any pending response replacements before building the turn.
 	if s.responseReplacer != nil {
 		flushDelta := s.accumulator.FlushResponseReplacements()
-		if flushDelta.VisibleText != "" && !s.bufferToolContent {
+		if flushDelta.RawText != "" && s.bufferToolContent {
+			batch := chatDeltaBatch{runtime: s}
+			s.processToolStreamEvents(&batch, toolstream.ProcessChunk(&s.toolSieve, flushDelta.RawText, s.toolNames))
+			batch.flush()
+		} else if flushDelta.VisibleText != "" {
 			s.sendDelta(map[string]any{"content": flushDelta.VisibleText})
 		}
 	}
@@ -263,25 +306,7 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		s.toolCallsDoneEmitted = true
 	} else if s.bufferToolContent {
 		batch := chatDeltaBatch{runtime: s}
-		for _, evt := range toolstream.Flush(&s.toolSieve, s.toolNames) {
-			if len(evt.ToolCalls) > 0 {
-				batch.flush()
-				s.toolCallsEmitted = true
-				s.toolCallsDoneEmitted = true
-				s.sendDelta(map[string]any{
-					"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
-				})
-				s.resetStreamToolCallState()
-			}
-			if evt.Content == "" {
-				continue
-			}
-			cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
-			if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
-				continue
-			}
-			batch.append("content", cleaned)
-		}
+		s.processToolStreamEvents(&batch, toolstream.Flush(&s.toolSieve, s.toolNames))
 		batch.flush()
 	}
 
@@ -349,47 +374,7 @@ func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedD
 		if !s.bufferToolContent {
 			batch.append("content", p.VisibleText)
 		} else {
-			events := toolstream.ProcessChunk(&s.toolSieve, p.RawText, s.toolNames)
-			for _, evt := range events {
-				if len(evt.ToolCallDeltas) > 0 {
-					if !s.emitEarlyToolDeltas {
-						continue
-					}
-					filtered := filterIncrementalToolCallDeltasByAllowed(evt.ToolCallDeltas, s.streamToolNames)
-					if len(filtered) == 0 {
-						continue
-					}
-					formatted := formatIncrementalStreamToolCallDeltas(filtered, s.streamToolCallIDs)
-					if len(formatted) == 0 {
-						continue
-					}
-					batch.flush()
-					tcDelta := map[string]any{
-						"tool_calls": formatted,
-					}
-					s.toolCallsEmitted = true
-					s.sendDelta(tcDelta)
-					continue
-				}
-				if len(evt.ToolCalls) > 0 {
-					batch.flush()
-					s.toolCallsEmitted = true
-					s.toolCallsDoneEmitted = true
-					tcDelta := map[string]any{
-						"tool_calls": formatFinalStreamToolCallsWithStableIDs(evt.ToolCalls, s.streamToolCallIDs, s.toolsRaw),
-					}
-					s.sendDelta(tcDelta)
-					s.resetStreamToolCallState()
-					continue
-				}
-				if evt.Content != "" {
-					cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
-					if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
-						continue
-					}
-					batch.append("content", cleaned)
-				}
-			}
+			s.processToolStreamEvents(&batch, toolstream.ProcessChunk(&s.toolSieve, p.RawText, s.toolNames))
 		}
 	}
 	batch.flush()

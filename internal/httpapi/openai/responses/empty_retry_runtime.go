@@ -12,6 +12,7 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
+	"ds2api/internal/responserewrite"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
 )
@@ -80,7 +81,7 @@ func (h *Handler) prepareResponsesStreamRuntime(w http.ResponseWriter, resp *htt
 		h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 		toolChoice, traceID, func(obj map[string]any) {
 			h.getResponseStore().put(owner, responseID, obj)
-		}, historySession, nil, // responseReplacer
+		}, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	streamRuntime.sendCreated()

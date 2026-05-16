@@ -7,15 +7,19 @@ import (
 )
 
 type mockClaudeConfig struct {
-	aliases map[string]string
+	aliases                     map[string]string
+	responseReplacementsEnabled bool
+	responseReplacementRules    []config.ResponseReplacementRule
 }
 
 func (m mockClaudeConfig) ModelAliases() map[string]string { return m.aliases }
 
-func (m mockClaudeConfig) ResponseReplacementsEnabled() bool { return false }
-func (m mockClaudeConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
-func (mockClaudeConfig) CurrentInputFileEnabled() bool     { return true }
-func (mockClaudeConfig) CurrentInputFileMinChars() int     { return 0 }
+func (m mockClaudeConfig) ResponseReplacementsEnabled() bool { return m.responseReplacementsEnabled }
+func (m mockClaudeConfig) ResponseReplacementRules() []config.ResponseReplacementRule {
+	return m.responseReplacementRules
+}
+func (mockClaudeConfig) CurrentInputFileEnabled() bool { return true }
+func (mockClaudeConfig) CurrentInputFileMinChars() int { return 0 }
 
 func TestNormalizeClaudeRequestUsesGlobalAliasMapping(t *testing.T) {
 	req := map[string]any{

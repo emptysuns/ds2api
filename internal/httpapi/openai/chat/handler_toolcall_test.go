@@ -433,6 +433,59 @@ func TestHandleStreamDoesNotLeakToolTextWhenReplacementFlushCompletesToolCall(t 
 	}
 }
 
+func TestHandleStreamProcessesReplacementFlushAfterPriorToolCall(t *testing.T) {
+	h := &Handler{
+		Store: mockOpenAIConfig{
+			responseReplacementsEnabled: true,
+			responseReplacementRules: []config.ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "</|DEML", To: "</|DSML"},
+			},
+		},
+	}
+	resp := makeSSEHTTPResponse(
+		`data: {"p":"response/content","v":"<tool_calls><invoke name=\"read_file\"><parameter name=\"path\">README.MD</parameter></invoke></tool_calls>"}`,
+		`data: {"p":"response/content","v":"<|DEML|tool_calls>\n<|DEML|invoke name=\"mcp__exa__web_search_exa\">\n<|DEML|parameter name=\"query\"><![CDATA[Trump returns to US comment on China visit 2026]]></|DEML|parameter>\n<|DEML|parameter name=\"numResults\"><![CDATA[10]]></|DEML|parameter>\n</|DEML|invoke>\n</|DEML|tool_calls>"}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	h.handleStream(rec, req, resp, "cid-chat-dsml-flush", "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file", "mcp__exa__web_search_exa"}, nil, promptcompat.DefaultToolChoicePolicy(), nil)
+
+	frames, done := parseSSEDataFrames(t, rec.Body.String())
+	if !done {
+		t.Fatalf("expected [DONE], body=%s", rec.Body.String())
+	}
+	var content strings.Builder
+	toolCallNames := map[string]bool{}
+	for _, frame := range frames {
+		choices, _ := frame["choices"].([]any)
+		for _, item := range choices {
+			choice, _ := item.(map[string]any)
+			delta, _ := choice["delta"].(map[string]any)
+			if c, ok := delta["content"].(string); ok {
+				content.WriteString(c)
+			}
+			toolCalls, _ := delta["tool_calls"].([]any)
+			for _, rawCall := range toolCalls {
+				call, _ := rawCall.(map[string]any)
+				fn, _ := call["function"].(map[string]any)
+				name := asString(fn["name"])
+				if name != "" {
+					toolCallNames[name] = true
+				}
+			}
+		}
+	}
+	if leaked := content.String(); strings.Contains(strings.ToLower(leaked), "dsml") || strings.Contains(leaked, "mcp__exa__web_search_exa") || strings.Contains(leaked, "tool_") {
+		t.Fatalf("tool markup leaked to streamed content: %q body=%s", leaked, rec.Body.String())
+	}
+	if !toolCallNames["read_file"] || !toolCallNames["mcp__exa__web_search_exa"] {
+		t.Fatalf("expected both tool calls, got names=%#v body=%s", toolCallNames, rec.Body.String())
+	}
+}
+
 func TestHandleStreamHonorsExplicitToolChoiceNone(t *testing.T) {
 	h := &Handler{}
 	resp := makeSSEHTTPResponse(

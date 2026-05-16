@@ -11,7 +11,6 @@ import (
 	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
-	"ds2api/internal/toolcall"
 	"ds2api/internal/toolpolicy"
 	"ds2api/internal/toolstream"
 )
@@ -210,50 +209,7 @@ func (s *claudeStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 			continue
 		}
 
-		events := toolstream.ProcessChunk(&s.sieve, rawTrimmed, s.toolNames)
-		for _, evt := range events {
-			if len(evt.ToolCalls) > 0 {
-				s.closeTextBlock()
-				s.toolCallsDetected = true
-				normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
-				for _, tc := range normalized {
-					idx := s.nextBlockIndex
-					s.nextBlockIndex++
-					s.sendToolUseBlock(idx, tc)
-				}
-				continue
-			}
-			if evt.Content == "" {
-				continue
-			}
-			cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
-			if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
-				continue
-			}
-			s.closeThinkingBlock()
-			if !s.textBlockOpen {
-				s.textBlockIndex = s.nextBlockIndex
-				s.nextBlockIndex++
-				s.send("content_block_start", map[string]any{
-					"type":  "content_block_start",
-					"index": s.textBlockIndex,
-					"content_block": map[string]any{
-						"type": "text",
-						"text": "",
-					},
-				})
-				s.textBlockOpen = true
-			}
-			s.send("content_block_delta", map[string]any{
-				"type":  "content_block_delta",
-				"index": s.textBlockIndex,
-				"delta": map[string]any{
-					"type": "text_delta",
-					"text": cleaned,
-				},
-			})
-			s.textEmitted = true
-		}
+		s.emitToolStreamEvents(toolstream.ProcessChunk(&s.sieve, rawTrimmed, s.toolNames))
 	}
 
 	if s.history != nil {

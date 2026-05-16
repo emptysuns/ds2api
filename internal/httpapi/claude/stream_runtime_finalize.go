@@ -63,29 +63,70 @@ func (s *claudeStreamRuntime) sendToolUseBlock(idx int, tc toolcall.ParsedToolCa
 	})
 }
 
+func (s *claudeStreamRuntime) emitToolStreamEvents(events []toolstream.Event) {
+	for _, evt := range events {
+		if len(evt.ToolCalls) > 0 {
+			s.closeTextBlock()
+			s.toolCallsDetected = true
+			normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
+			for _, tc := range normalized {
+				idx := s.nextBlockIndex
+				s.nextBlockIndex++
+				s.sendToolUseBlock(idx, tc)
+			}
+			continue
+		}
+		if evt.Content == "" {
+			continue
+		}
+		cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
+		if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
+			continue
+		}
+		s.closeThinkingBlock()
+		if !s.textBlockOpen {
+			s.textBlockIndex = s.nextBlockIndex
+			s.nextBlockIndex++
+			s.send("content_block_start", map[string]any{
+				"type":  "content_block_start",
+				"index": s.textBlockIndex,
+				"content_block": map[string]any{
+					"type": "text",
+					"text": "",
+				},
+			})
+			s.textBlockOpen = true
+		}
+		s.send("content_block_delta", map[string]any{
+			"type":  "content_block_delta",
+			"index": s.textBlockIndex,
+			"delta": map[string]any{
+				"type": "text_delta",
+				"text": cleaned,
+			},
+		})
+		s.textEmitted = true
+	}
+}
+
 func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool) bool {
 	if s.ended {
 		return true
 	}
 
-	if s.bufferToolContent {
-		for _, evt := range toolstream.Flush(&s.sieve, s.toolNames) {
-			if len(evt.ToolCalls) > 0 {
-				s.closeTextBlock()
-				s.toolCallsDetected = true
-				normalized := toolcall.NormalizeParsedToolCallsForSchemas(evt.ToolCalls, s.toolsRaw)
-				for _, tc := range normalized {
-					idx := s.nextBlockIndex
-					s.nextBlockIndex++
-					s.sendToolUseBlock(idx, tc)
-				}
-				continue
+	// Flush replacement-held tail bytes before the tool sieve can release an incomplete capture.
+	if s.responseReplacer != nil {
+		flushed := s.responseReplacer.Flush()
+		if flushed != "" {
+			s.rawText.WriteString(flushed)
+			cleaned := cleanVisibleOutput(flushed, s.stripReferenceMarkers)
+			if cleaned != "" && (!s.searchEnabled || !sse.IsCitation(cleaned)) {
+				s.text.WriteString(cleaned)
 			}
-			if evt.Content != "" {
-				cleaned := cleanVisibleOutput(evt.Content, s.stripReferenceMarkers)
-				if cleaned == "" || (s.searchEnabled && sse.IsCitation(cleaned)) {
-					continue
-				}
+			if s.bufferToolContent {
+				s.emitToolStreamEvents(toolstream.ProcessChunk(&s.sieve, flushed, s.toolNames))
+			} else if cleaned != "" && (!s.searchEnabled || !sse.IsCitation(cleaned)) {
+				s.closeThinkingBlock()
 				if !s.textBlockOpen {
 					s.textBlockIndex = s.nextBlockIndex
 					s.nextBlockIndex++
@@ -112,41 +153,8 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 		}
 	}
 
-	// Flush any pending response replacements before building the turn.
-	if s.responseReplacer != nil {
-		flushed := s.responseReplacer.Flush()
-		if flushed != "" {
-			s.rawText.WriteString(flushed)
-			cleaned := cleanVisibleOutput(flushed, s.stripReferenceMarkers)
-			if cleaned != "" && (!s.searchEnabled || !sse.IsCitation(cleaned)) {
-				s.text.WriteString(cleaned)
-				if !s.bufferToolContent {
-					s.closeThinkingBlock()
-					if !s.textBlockOpen {
-						s.textBlockIndex = s.nextBlockIndex
-						s.nextBlockIndex++
-						s.send("content_block_start", map[string]any{
-							"type":  "content_block_start",
-							"index": s.textBlockIndex,
-							"content_block": map[string]any{
-								"type": "text",
-								"text": "",
-							},
-						})
-						s.textBlockOpen = true
-					}
-					s.send("content_block_delta", map[string]any{
-						"type":  "content_block_delta",
-						"index": s.textBlockIndex,
-						"delta": map[string]any{
-							"type": "text_delta",
-							"text": cleaned,
-						},
-					})
-					s.textEmitted = true
-				}
-			}
-		}
+	if s.bufferToolContent {
+		s.emitToolStreamEvents(toolstream.Flush(&s.sieve, s.toolNames))
 	}
 
 	s.closeTextBlock()

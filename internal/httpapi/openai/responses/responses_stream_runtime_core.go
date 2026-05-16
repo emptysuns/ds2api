@@ -168,16 +168,16 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 	s.finalErrorStatus = 0
 	s.finalErrorMessage = ""
 	s.finalErrorCode = ""
-	if s.bufferToolContent {
-		s.processToolStreamEvents(toolstream.Flush(&s.sieve, s.toolNames), true, true)
-	}
-
-	// Flush any pending response replacements before building the turn.
 	if s.responseReplacer != nil {
 		flushDelta := s.accumulator.FlushResponseReplacements()
-		if flushDelta.VisibleText != "" && !s.bufferToolContent {
+		if flushDelta.RawText != "" && s.bufferToolContent {
+			s.processToolStreamEvents(toolstream.ProcessChunk(&s.sieve, flushDelta.RawText, s.toolNames), true, true)
+		} else if flushDelta.VisibleText != "" {
 			s.emitTextDelta(flushDelta.VisibleText)
 		}
+	}
+	if s.bufferToolContent {
+		s.processToolStreamEvents(toolstream.Flush(&s.sieve, s.toolNames), true, true)
 	}
 
 	finalThinking := s.accumulator.Thinking.String()

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
 )
 
@@ -167,6 +168,78 @@ func TestPrepareResponsesStreamRuntimeBuffersToolSyntaxWithoutDeclaredTools(t *t
 	}
 	if !runtime.bufferToolContent {
 		t.Fatalf("expected Responses retry runtime to buffer tool syntax for default tool_choice without declared tools")
+	}
+}
+
+func TestHandleResponsesStreamAppliesResponseReplacements(t *testing.T) {
+	h := &Handler{
+		Store: mockResponsesConfig{
+			responseReplacementsEnabled: true,
+			responseReplacementRules: []config.ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+			},
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	rec := httptest.NewRecorder()
+
+	b, _ := json.Marshal(map[string]any{
+		"p": "response/content",
+		"v": "prefix <|DEML marker",
+	})
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("data: " + string(b) + "\ndata: [DONE]\n")),
+	}
+
+	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_rewrite", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.ToolChoicePolicy{Mode: promptcompat.ToolChoiceNone}, "")
+
+	body := rec.Body.String()
+	textPayloads := extractSSEEventPayloads(body, "response.output_text.delta")
+	var text strings.Builder
+	for _, payload := range textPayloads {
+		text.WriteString(asString(payload["delta"]))
+	}
+	if got := text.String(); !strings.Contains(got, "prefix <|DSML marker") || strings.Contains(got, "<|DEML") {
+		t.Fatalf("expected Responses stream replacement, got %q body=%s", got, body)
+	}
+}
+
+func TestHandleResponsesStreamDoesNotLeakToolTextWhenReplacementFlushCompletesToolCall(t *testing.T) {
+	h := &Handler{
+		Store: mockResponsesConfig{
+			responseReplacementsEnabled: true,
+			responseReplacementRules: []config.ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "</|DEML", To: "</|DSML"},
+			},
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	rec := httptest.NewRecorder()
+
+	b, _ := json.Marshal(map[string]any{
+		"p": "response/content",
+		"v": "<|DEML|tool_calls>\n<|DEML|invoke name=\"mcp__exa__web_search_exa\">\n<|DEML|parameter name=\"query\"><![CDATA[Trump returns to US comment on China visit 2026]]></|DEML|parameter>\n<|DEML|parameter name=\"numResults\"><![CDATA[10]]></|DEML|parameter>\n</|DEML|invoke>\n</|DEML|tool_calls>",
+	})
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("data: " + string(b) + "\ndata: [DONE]\n")),
+	}
+
+	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_dsml_flush", "deepseek-v4-flash", "prompt", 0, false, false, []string{"mcp__exa__web_search_exa"}, nil, promptcompat.DefaultToolChoicePolicy(), "")
+
+	body := rec.Body.String()
+	textPayloads := extractSSEEventPayloads(body, "response.output_text.delta")
+	var text strings.Builder
+	for _, payload := range textPayloads {
+		text.WriteString(asString(payload["delta"]))
+	}
+	if leaked := text.String(); strings.Contains(strings.ToLower(leaked), "dsml") || strings.Contains(leaked, "mcp__exa__web_search_exa") || strings.Contains(leaked, "tool_") {
+		t.Fatalf("tool markup leaked to responses stream text: %q body=%s", leaked, body)
+	}
+	if len(extractSSEEventPayloads(body, "response.output_item.done")) == 0 || !strings.Contains(body, "mcp__exa__web_search_exa") {
+		t.Fatalf("expected function call events for rewritten tool call, body=%s", body)
 	}
 }
 

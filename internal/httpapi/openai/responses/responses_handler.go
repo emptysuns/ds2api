@@ -19,6 +19,7 @@ import (
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -217,7 +218,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 			h.getResponseStore().put(owner, responseID, obj)
 		},
 		nil,
-		nil, // responseReplacer
+		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	streamRuntime.sendCreated()
