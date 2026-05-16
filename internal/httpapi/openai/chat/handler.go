@@ -13,6 +13,7 @@ import (
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/textclean"
 	"ds2api/internal/toolcall"
 	"ds2api/internal/toolstream"
@@ -48,7 +49,7 @@ func (h *Handler) applyCurrentInputFile(ctx context.Context, a *auth.RequestAuth
 		return stdReq, nil
 	}
 	stdReq = shared.ApplyThinkingInjection(h.Store, stdReq)
-	svc := history.Service{Store: h.Store, DS: h.DS}
+	svc := history.Service{Store: h.Store, DS: h.DS, RequestReplacements: responserewrite.ReverseRules(h.responseReplacementRules())}
 	out, err := svc.ApplyCurrentInputFile(ctx, a, stdReq)
 	if err != nil || out.CurrentInputFileApplied {
 		return out, err

@@ -9,16 +9,18 @@ import (
 )
 
 type mockOpenAIConfig struct {
-	aliases             map[string]string
-	autoDeleteMode      string
-	toolMode            string
-	earlyEmit           string
-	responsesTTL        int
-	embedProv           string
-	currentInputEnabled bool
-	currentInputMin     int
-	thinkingInjection   *bool
-	thinkingPrompt      string
+	aliases                     map[string]string
+	autoDeleteMode              string
+	toolMode                    string
+	earlyEmit                   string
+	responsesTTL                int
+	embedProv                   string
+	currentInputEnabled         bool
+	currentInputMin             int
+	thinkingInjection           *bool
+	thinkingPrompt              string
+	responseReplacementsEnabled bool
+	responseReplacementRules    []config.ResponseReplacementRule
 }
 
 func (m mockOpenAIConfig) ModelAliases() map[string]string     { return m.aliases }
@@ -43,21 +45,22 @@ func (m mockOpenAIConfig) ThinkingInjectionEnabled() bool {
 	}
 	return *m.thinkingInjection
 }
-func (m mockOpenAIConfig) ThinkingInjectionPrompt() string { return m.thinkingPrompt }
-func (m mockOpenAIConfig) OutputIntegrityGuardEnabled() bool { return true }
-func (m mockOpenAIConfig) OutputIntegrityGuardText() string    { return "" }
-func (m mockOpenAIConfig) SentinelsEnabled() bool              { return true }
+func (m mockOpenAIConfig) ThinkingInjectionPrompt() string          { return m.thinkingPrompt }
+func (m mockOpenAIConfig) OutputIntegrityGuardEnabled() bool        { return true }
+func (m mockOpenAIConfig) OutputIntegrityGuardText() string         { return "" }
+func (m mockOpenAIConfig) SentinelsEnabled() bool                   { return true }
 func (m mockOpenAIConfig) SentinelOverrides() config.SentinelConfig { return config.SentinelConfig{} }
-func (m mockOpenAIConfig) ToolCallInstructionsEnabled() bool   { return true }
-func (m mockOpenAIConfig) ToolCallInstructionsText() string    { return "" }
-func (m mockOpenAIConfig) ReadToolCacheGuardEnabled() bool     { return true }
-func (m mockOpenAIConfig) ReadToolCacheGuardText() string      { return "" }
-func (m mockOpenAIConfig) EmptyOutputRetrySuffixEnabled() bool { return true }
-func (m mockOpenAIConfig) EmptyOutputRetrySuffixText() string  { return "" }
+func (m mockOpenAIConfig) ToolCallInstructionsEnabled() bool        { return true }
+func (m mockOpenAIConfig) ToolCallInstructionsText() string         { return "" }
+func (m mockOpenAIConfig) ReadToolCacheGuardEnabled() bool          { return true }
+func (m mockOpenAIConfig) ReadToolCacheGuardText() string           { return "" }
+func (m mockOpenAIConfig) EmptyOutputRetrySuffixEnabled() bool      { return true }
+func (m mockOpenAIConfig) EmptyOutputRetrySuffixText() string       { return "" }
 
-func (m mockOpenAIConfig) ResponseReplacementsEnabled() bool { return false }
-func (m mockOpenAIConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
-
+func (m mockOpenAIConfig) ResponseReplacementsEnabled() bool { return m.responseReplacementsEnabled }
+func (m mockOpenAIConfig) ResponseReplacementRules() []config.ResponseReplacementRule {
+	return m.responseReplacementRules
+}
 
 func TestNormalizeOpenAIChatRequestWithConfigInterface(t *testing.T) {
 	cfg := mockOpenAIConfig{

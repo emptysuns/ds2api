@@ -11,6 +11,7 @@ import (
 	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 )
 
 type CurrentInputConfigReader interface {
@@ -23,8 +24,9 @@ type CurrentInputUploader interface {
 }
 
 type Service struct {
-	Store CurrentInputConfigReader
-	DS    CurrentInputUploader
+	Store               CurrentInputConfigReader
+	DS                  CurrentInputUploader
+	RequestReplacements []config.ResponseReplacementRule
 }
 
 func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth, stdReq promptcompat.StandardRequest) (promptcompat.StandardRequest, error) {
@@ -55,7 +57,7 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 		ContentType: v.ContentType,
 		Purpose:     v.Purpose,
 		ModelType:   modelType,
-		Data:        []byte(fileText),
+		Data:        []byte(s.uploadText(fileText)),
 	}, 3)
 	if err != nil {
 		return stdReq, fmt.Errorf("upload current user input file: %w", err)
@@ -72,7 +74,7 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 			ContentType: v.ContentType,
 			Purpose:     v.Purpose,
 			ModelType:   modelType,
-			Data:        []byte(toolsText),
+			Data:        []byte(s.uploadText(toolsText)),
 		}, 3)
 		if err != nil {
 			return stdReq, fmt.Errorf("upload current tools file: %w", err)
@@ -106,6 +108,13 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 	return stdReq, nil
 }
 
+func (s Service) uploadText(text string) string {
+	if len(s.RequestReplacements) == 0 {
+		return text
+	}
+	return responserewrite.Apply(text, s.RequestReplacements)
+}
+
 func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.RequestAuth, stdReq promptcompat.StandardRequest) (promptcompat.StandardRequest, error) {
 	if !stdReq.CurrentInputFileApplied || s.DS == nil || a == nil {
 		return stdReq, nil
@@ -124,7 +133,7 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 		ContentType: v.ContentType,
 		Purpose:     v.Purpose,
 		ModelType:   modelType,
-		Data:        []byte(stdReq.HistoryText),
+		Data:        []byte(s.uploadText(stdReq.HistoryText)),
 	}, 3)
 	if err != nil {
 		return stdReq, fmt.Errorf("upload current user input file: %w", err)
@@ -142,7 +151,7 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 			ContentType: v.ContentType,
 			Purpose:     v.Purpose,
 			ModelType:   modelType,
-			Data:        []byte(toolsText),
+			Data:        []byte(s.uploadText(toolsText)),
 		}, 3)
 		if err != nil {
 			return stdReq, fmt.Errorf("upload current tools file: %w", err)

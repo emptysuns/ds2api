@@ -232,7 +232,7 @@ func (h *Handler) handleVercelStreamSwitch(w http.ResponseWriter, r *http.Reques
 	stdReq := lease.Standard
 	var err error
 	if stdReq.CurrentInputFileApplied {
-		stdReq, err = (history.Service{Store: h.Store, DS: h.DS}).ReuploadAppliedCurrentInputFile(r.Context(), a, stdReq)
+		stdReq, err = (history.Service{Store: h.Store, DS: h.DS, RequestReplacements: responserewrite.ReverseRules(h.responseReplacementRules())}).ReuploadAppliedCurrentInputFile(r.Context(), a, stdReq)
 		if err != nil {
 			status, message := mapCurrentInputFileError(err)
 			writeOpenAIError(w, status, message)

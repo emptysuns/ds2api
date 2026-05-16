@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"ds2api/internal/auth"
+	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/util"
@@ -459,6 +460,51 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 	}
 	if !strings.Contains(out.PromptTokenText, v.HistoryTranscriptTitle) || !strings.Contains(out.PromptTokenText, v.ToolsTranscriptTitle) || !strings.Contains(out.PromptTokenText, "Description: search docs") {
 		t.Fatalf("expected prompt token text to include uploaded history and tools content, got %q", out.PromptTokenText)
+	}
+}
+
+func TestApplyCurrentInputFileRewritesUploadedHistoryWithoutMutatingInternalHistory(t *testing.T) {
+	ds := &inlineUploadDSStub{}
+	h := &openAITestSurface{
+		Store: mockOpenAIConfig{
+			currentInputEnabled:         true,
+			responseReplacementsEnabled: true,
+			responseReplacementRules: []config.ResponseReplacementRule{
+				{From: "<|DEML", To: "<|DSML"},
+				{From: "</|DEML", To: "</|DSML"},
+			},
+		},
+		DS: ds,
+	}
+	req := map[string]any{
+		"model": "deepseek-v4-flash",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "before"},
+			map[string]any{
+				"role":    "assistant",
+				"content": `<|DSML|tool_calls><|DSML|invoke name="search"></|DSML|invoke></|DSML|tool_calls>`,
+			},
+			map[string]any{"role": "user", "content": "latest user turn"},
+		},
+	}
+	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+
+	out, err := h.applyCurrentInputFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, stdReq)
+	if err != nil {
+		t.Fatalf("apply current input file failed: %v", err)
+	}
+	if len(ds.uploadCalls) != 1 {
+		t.Fatalf("expected one current input upload, got %d", len(ds.uploadCalls))
+	}
+	uploadedText := string(ds.uploadCalls[0].Data)
+	if !strings.Contains(uploadedText, "<|DEML|tool_calls>") || strings.Contains(uploadedText, "<|DSML") {
+		t.Fatalf("expected uploaded history to use outbound DEML only, got %q", uploadedText)
+	}
+	if !strings.Contains(out.HistoryText, "<|DSML|tool_calls>") || strings.Contains(out.HistoryText, "<|DEML") {
+		t.Fatalf("expected internal history to remain DSML, got %q", out.HistoryText)
 	}
 }
 

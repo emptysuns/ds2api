@@ -159,7 +159,7 @@ func startPayloadCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekCa
 	}
 	nextPayload := clonePayload(payload)
 	if opts.CurrentInputFile != nil && opts.Request.CurrentInputFileApplied {
-		stdReq, prepErr := reuploadCurrentInputFileForAccount(ctx, ds, a, opts.Request, Options{CurrentInputFile: opts.CurrentInputFile})
+		stdReq, prepErr := reuploadCurrentInputFileForAccount(ctx, ds, a, opts.Request, Options{CurrentInputFile: opts.CurrentInputFile, ResponseReplacements: opts.ResponseReplacements})
 		if prepErr != nil {
 			return StartResult{SessionID: sessionID}, prepErr
 		}

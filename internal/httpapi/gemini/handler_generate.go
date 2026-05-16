@@ -20,6 +20,7 @@ import (
 	"ds2api/internal/httpapi/requestbody"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
+	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	"ds2api/internal/toolcall"
 	"ds2api/internal/translatorcliproxy"
@@ -120,7 +121,7 @@ func (h *Handler) applyCurrentInputFile(ctx context.Context, a *auth.RequestAuth
 	if h == nil {
 		return stdReq, nil
 	}
-	return (history.Service{Store: h.Store, DS: h.DS}).ApplyCurrentInputFile(ctx, a, stdReq)
+	return (history.Service{Store: h.Store, DS: h.DS, RequestReplacements: responserewrite.ReverseRules(h.responseReplacementRules())}).ApplyCurrentInputFile(ctx, a, stdReq)
 }
 
 func mapCurrentInputFileError(err error) (int, string) {

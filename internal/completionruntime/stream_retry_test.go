@@ -48,7 +48,7 @@ func TestExecuteStreamWithRetryRewritesPromptAfterCurrentInputAccountSwitch(t *t
 		RequestedModel:          "deepseek-v4-flash",
 		ResolvedModel:           "deepseek-v4-flash",
 		FinalPrompt:             `<|DSML|tool_calls><|DSML|invoke name="search"></|DSML|invoke></|DSML|tool_calls>`,
-		HistoryText:             "large current input",
+		HistoryText:             `large current input <|DSML|tool_calls></|DSML|tool_calls>`,
 		CurrentInputFileApplied: true,
 		CurrentInputFileID:      "file-runtime-acc1@test.com",
 		RefFileIDs:              []string{"file-runtime-acc1@test.com"},
@@ -97,6 +97,13 @@ func TestExecuteStreamWithRetryRewritesPromptAfterCurrentInputAccountSwitch(t *t
 	}
 	if got := ds.payloads[1]["chat_session_id"]; got != "session-acc2@test.com" {
 		t.Fatalf("switched payload session mismatch: %#v", got)
+	}
+	if len(ds.uploads) != 1 {
+		t.Fatalf("expected one switched-account history reupload, got %d", len(ds.uploads))
+	}
+	uploadedText := string(ds.uploads[0].Data)
+	if !strings.Contains(uploadedText, "<|DEML|tool_calls>") || strings.Contains(uploadedText, "<|DSML") {
+		t.Fatalf("expected reuploaded history to use outbound DEML only, got %q", uploadedText)
 	}
 }
 

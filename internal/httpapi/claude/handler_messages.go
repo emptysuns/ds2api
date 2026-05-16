@@ -128,7 +128,7 @@ func (h *Handler) applyCurrentInputFile(ctx context.Context, a *auth.RequestAuth
 	if h == nil {
 		return stdReq, nil
 	}
-	return (history.Service{Store: h.Store, DS: h.DS}).ApplyCurrentInputFile(ctx, a, stdReq)
+	return (history.Service{Store: h.Store, DS: h.DS, RequestReplacements: responserewrite.ReverseRules(h.responseReplacementRules())}).ApplyCurrentInputFile(ctx, a, stdReq)
 }
 
 func mapCurrentInputFileError(err error) (int, string) {

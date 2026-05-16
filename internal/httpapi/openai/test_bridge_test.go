@@ -11,6 +11,7 @@ import (
 
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
+	"ds2api/internal/config"
 	"ds2api/internal/httpapi/openai/chat"
 	"ds2api/internal/httpapi/openai/embeddings"
 	"ds2api/internal/httpapi/openai/files"
@@ -18,6 +19,7 @@ import (
 	"ds2api/internal/httpapi/openai/responses"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
+	"ds2api/internal/responserewrite"
 )
 
 type openAITestSurface struct {
@@ -85,7 +87,11 @@ func (h *openAITestSurface) ChatCompletions(w http.ResponseWriter, r *http.Reque
 
 func (h *openAITestSurface) applyCurrentInputFile(ctx context.Context, a *auth.RequestAuth, stdReq promptcompat.StandardRequest) (promptcompat.StandardRequest, error) {
 	stdReq = shared.ApplyThinkingInjection(h.Store, stdReq)
-	svc := history.Service{Store: h.Store, DS: h.DS}
+	var replacements []config.ResponseReplacementRule
+	if h.Store != nil && h.Store.ResponseReplacementsEnabled() {
+		replacements = responserewrite.ReverseRules(h.Store.ResponseReplacementRules())
+	}
+	svc := history.Service{Store: h.Store, DS: h.DS, RequestReplacements: replacements}
 	out, err := svc.ApplyCurrentInputFile(ctx, a, stdReq)
 	if err != nil || out.CurrentInputFileApplied {
 		return out, err
