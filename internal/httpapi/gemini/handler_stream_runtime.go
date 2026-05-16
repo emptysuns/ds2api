@@ -201,6 +201,7 @@ func newGeminiStreamRuntime(
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
+			PreserveToolMarkup:    !toolpolicy.ShouldParseToolCalls(toolChoice),
 			ResponseReplacer:      responseReplacer,
 		}),
 	}
@@ -282,9 +283,6 @@ func (s *geminiStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 			continue
 		}
 		visibleText := p.VisibleText
-		if !toolpolicy.ShouldParseToolCalls(s.toolChoice) {
-			visibleText = p.RawText
-		}
 		if p.RawText == "" || p.CitationOnly || visibleText == "" {
 			continue
 		}

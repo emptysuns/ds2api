@@ -465,7 +465,7 @@ func TestNativeStreamGenerateContentDetectsToolUseWithoutDeclaredTools(t *testin
 func TestNativeStreamGenerateContentHonorsExplicitToolChoiceNone(t *testing.T) {
 	h := &Handler{}
 	resp := makeGeminiUpstreamResponse(
-		`data: {"p":"response/content","v":"<|DSML|tool_calls>\n  <|DSML|invoke name=\"Bash\">\n    <|DSML|parameter name=\"command\"><![CDATA[pwd]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>"}`,
+		`data: {"p":"response/content","v":"<|assistant|><|DSML|tool_calls>\n  <|DSML|invoke name=\"Bash\">\n    <|DSML|parameter name=\"command\"><![CDATA[pwd]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>"}`,
 		`data: [DONE]`,
 	)
 	rec := httptest.NewRecorder()
@@ -485,6 +485,9 @@ func TestNativeStreamGenerateContentHonorsExplicitToolChoiceNone(t *testing.T) {
 	}
 	if !strings.Contains(text, "DSML|tool_calls") {
 		t.Fatalf("expected raw tool markup to remain visible, got text=%q body=%s", text, rec.Body.String())
+	}
+	if strings.Contains(text, "<|assistant|>") {
+		t.Fatalf("expected leaked control marker to be stripped, got text=%q body=%s", text, rec.Body.String())
 	}
 }
 

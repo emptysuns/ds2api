@@ -34,6 +34,7 @@ type AccumulatorOptions struct {
 	ThinkingEnabled       bool
 	SearchEnabled         bool
 	StripReferenceMarkers bool
+	PreserveToolMarkup    bool
 	ResponseReplacer      *responserewrite.StreamReplacer
 }
 
@@ -43,6 +44,7 @@ func NewAccumulator(opts AccumulatorOptions) *Accumulator {
 			ThinkingEnabled:       opts.ThinkingEnabled,
 			SearchEnabled:         opts.SearchEnabled,
 			StripReferenceMarkers: opts.StripReferenceMarkers,
+			PreserveToolMarkup:    opts.PreserveToolMarkup,
 			ResponseReplacer:      opts.ResponseReplacer,
 		},
 	}
