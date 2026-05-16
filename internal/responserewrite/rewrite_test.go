@@ -2,6 +2,7 @@ package responserewrite
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"ds2api/internal/config"
 )
@@ -126,6 +127,24 @@ func TestStreamReplacerDoesNotSplitOpeningMatchAcrossEmitBoundary(t *testing.T) 
 	want := "<|DSML|i"
 	if got != want {
 		t.Fatalf("stream replacement=%q want=%q parts=%#v", got, want, parts)
+	}
+}
+
+func TestStreamReplacerKeepsUTF8ChunkBoundaries(t *testing.T) {
+	r := NewStreamReplacer([]config.ResponseReplacementRule{{From: "ABCDEFG", To: "HI"}})
+	parts := []string{
+		r.Push("你好世界"),
+		r.Flush(),
+	}
+	got := parts[0] + parts[1]
+	want := "你好世界"
+	if got != want {
+		t.Fatalf("stream replacement=%q want=%q parts=%#v", got, want, parts)
+	}
+	for i, part := range parts {
+		if !utf8.ValidString(part) {
+			t.Fatalf("part[%d] invalid utf-8: %q", i, part)
+		}
 	}
 }
 

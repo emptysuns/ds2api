@@ -2,6 +2,7 @@ package responserewrite
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"ds2api/internal/config"
 )
@@ -63,6 +64,7 @@ func (r *StreamReplacer) Push(chunk string) string {
 		return ""
 	}
 	emitLen := r.safeEmitLen()
+	emitLen = floorUTF8Boundary(r.pending, emitLen)
 	if emitLen <= 0 {
 		return ""
 	}
@@ -105,4 +107,17 @@ func (r *StreamReplacer) Flush() string {
 	out := Apply(r.pending, r.rules)
 	r.pending = ""
 	return out
+}
+
+func floorUTF8Boundary(text string, limit int) int {
+	if limit <= 0 {
+		return 0
+	}
+	if limit >= len(text) {
+		return len(text)
+	}
+	for limit > 0 && !utf8.RuneStart(text[limit]) {
+		limit--
+	}
+	return limit
 }
