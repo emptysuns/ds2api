@@ -44,6 +44,11 @@ func (w *OpenAIStreamTranslatorWriter) WriteHeader(statusCode int) {
 		return
 	}
 	w.statusCode = statusCode
+	if statusCode >= 200 && statusCode < 300 {
+		if contentType := strings.TrimSpace(w.dst.Header().Get("Content-Type")); strings.HasPrefix(contentType, "text/event-stream") || contentType == "" {
+			w.dst.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+		}
+	}
 	w.headersSent = true
 	w.dst.WriteHeader(statusCode)
 }

@@ -24,11 +24,12 @@ type streamStatusClaudeStoreStub struct{}
 
 func (streamStatusClaudeStoreStub) ModelAliases() map[string]string { return nil }
 
-func (streamStatusClaudeStoreStub) CurrentInputFileEnabled() bool { return true }
-func (streamStatusClaudeStoreStub) CurrentInputFileMinChars() int { return 0 }
+func (streamStatusClaudeStoreStub) CurrentInputFileEnabled() bool       { return true }
+func (streamStatusClaudeStoreStub) CurrentInputFileMinChars() int       { return 0 }
 func (m streamStatusClaudeStoreStub) ResponseReplacementsEnabled() bool { return false }
-func (m streamStatusClaudeStoreStub) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
-
+func (m streamStatusClaudeStoreStub) ResponseReplacementRules() []config.ResponseReplacementRule {
+	return nil
+}
 
 func captureClaudeStatusMiddleware(statuses *[]int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -64,5 +65,27 @@ func TestClaudeMessagesStreamStatusCapturedAs200(t *testing.T) {
 	}
 	if statuses[0] != http.StatusOK {
 		t.Fatalf("expected captured status 200 (not 000), got %d", statuses[0])
+	}
+}
+
+func TestClaudeMessagesStreamContentTypeIncludesUTF8Charset(t *testing.T) {
+	h := &Handler{
+		Store:  streamStatusClaudeStoreStub{},
+		OpenAI: streamStatusClaudeOpenAIStub{},
+	}
+	r := chi.NewRouter()
+	RegisterRoutes(r, h)
+
+	reqBody := `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"请只输出：你好世界"}],"stream":true}`
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "text/event-stream; charset=utf-8" {
+		t.Fatalf("expected UTF-8 SSE content type, got %q", got)
 	}
 }
