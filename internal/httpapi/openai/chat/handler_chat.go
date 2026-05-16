@@ -18,6 +18,7 @@ import (
 	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
+	"ds2api/internal/toolpolicy"
 )
 
 func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +217,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 	}
 
 	created := time.Now().Unix()
-	bufferToolContent := !toolChoice.IsNone()
+	bufferToolContent := toolpolicy.ShouldBufferToolContent(toolChoice)
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
 	stripReferenceMarkers := stripReferenceMarkersEnabled()
 	initialType := "text"

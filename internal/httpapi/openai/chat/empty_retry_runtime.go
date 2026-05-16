@@ -16,6 +16,7 @@ import (
 	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
+	"ds2api/internal/toolpolicy"
 )
 
 func (h *Handler) handleNonStreamWithRetry(w http.ResponseWriter, ctx context.Context, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, completionID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, historySession *chatHistorySession) {
@@ -138,7 +139,7 @@ func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Res
 		w, rc, canFlush, completionID, time.Now().Unix(), model, finalPrompt,
 		thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw,
 		toolChoice,
-		!toolChoice.IsNone(), h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
+		toolpolicy.ShouldBufferToolContent(toolChoice), h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens

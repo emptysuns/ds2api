@@ -13,6 +13,7 @@ import (
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
 	streamengine "ds2api/internal/stream"
+	"ds2api/internal/toolpolicy"
 )
 
 func (h *Handler) handleResponsesStreamWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, owner, responseID string, stdReq promptcompat.StandardRequest, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, traceID string, historySession *responsehistory.Session) {
@@ -75,7 +76,7 @@ func (h *Handler) prepareResponsesStreamRuntime(w http.ResponseWriter, resp *htt
 	}
 	streamRuntime := newResponsesStreamRuntime(
 		w, rc, canFlush, responseID, model, finalPrompt, thinkingEnabled, searchEnabled,
-		stripReferenceMarkersEnabled(), toolNames, toolsRaw, !toolChoice.IsNone(),
+		stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolpolicy.ShouldBufferToolContent(toolChoice),
 		h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 		toolChoice, traceID, func(obj map[string]any) {
 			h.getResponseStore().put(owner, responseID, obj)

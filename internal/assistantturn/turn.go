@@ -8,6 +8,7 @@ import (
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
 	"ds2api/internal/toolcall"
+	"ds2api/internal/toolpolicy"
 	"ds2api/internal/util"
 )
 
@@ -91,15 +92,16 @@ type StreamSnapshot struct {
 }
 
 func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
-	thinking := shared.CleanVisibleOutputWithPolicy(result.Thinking, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
-	text := shared.CleanVisibleOutputWithPolicy(result.Text, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
+	preserveToolMarkup := !toolpolicy.ShouldParseToolCalls(opts.ToolChoice)
+	thinking := shared.CleanVisibleOutputWithPolicy(result.Thinking, opts.StripReferenceMarkers, preserveToolMarkup)
+	text := shared.CleanVisibleOutputWithPolicy(result.Text, opts.StripReferenceMarkers, preserveToolMarkup)
 	if opts.SearchEnabled {
 		text = shared.ReplaceCitationMarkersWithLinks(text, result.CitationLinks)
 	}
 
 	parsed := toolcall.ToolCallParseResult{}
 	var calls []toolcall.ParsedToolCall
-	if !opts.ToolChoice.IsNone() {
+	if toolpolicy.ShouldParseToolCalls(opts.ToolChoice) {
 		parsed = shared.DetectAssistantToolCalls(result.Text, text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
 		calls = toolcall.NormalizeParsedToolCallsForSchemas(parsed.Calls, opts.ToolsRaw)
 		parsed.Calls = calls
@@ -137,15 +139,16 @@ func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
 }
 
 func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Turn {
-	thinking := shared.CleanVisibleOutputWithPolicy(snapshot.VisibleThinking, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
-	text := shared.CleanVisibleOutputWithPolicy(snapshot.VisibleText, opts.StripReferenceMarkers, opts.ToolChoice.IsNone())
+	preserveToolMarkup := !toolpolicy.ShouldParseToolCalls(opts.ToolChoice)
+	thinking := shared.CleanVisibleOutputWithPolicy(snapshot.VisibleThinking, opts.StripReferenceMarkers, preserveToolMarkup)
+	text := shared.CleanVisibleOutputWithPolicy(snapshot.VisibleText, opts.StripReferenceMarkers, preserveToolMarkup)
 	if opts.SearchEnabled {
 		text = shared.ReplaceCitationMarkersWithLinks(text, snapshot.CitationLinks)
 	}
 
 	parsed := toolcall.ToolCallParseResult{}
 	var calls []toolcall.ParsedToolCall
-	if !opts.ToolChoice.IsNone() {
+	if toolpolicy.ShouldParseToolCalls(opts.ToolChoice) {
 		parsed = shared.DetectAssistantToolCalls(snapshot.RawText, text, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
 		calls = parsed.Calls
 		if len(calls) == 0 && len(snapshot.AdditionalToolCalls) > 0 {

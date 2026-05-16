@@ -14,6 +14,7 @@ import (
 	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
+	"ds2api/internal/toolpolicy"
 	"ds2api/internal/toolstream"
 )
 
@@ -118,7 +119,7 @@ func newResponsesStreamRuntime(
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
-			PreserveToolMarkup:    toolChoice.IsNone(),
+			PreserveToolMarkup:    !toolpolicy.ShouldParseToolCalls(toolChoice),
 			ResponseReplacer:      responseReplacer,
 		},
 	}

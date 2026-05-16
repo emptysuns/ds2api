@@ -12,6 +12,7 @@ import (
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolcall"
+	"ds2api/internal/toolpolicy"
 	"ds2api/internal/toolstream"
 )
 
@@ -79,7 +80,7 @@ func newClaudeStreamRuntime(
 		messages:              messages,
 		thinkingEnabled:       thinkingEnabled,
 		searchEnabled:         searchEnabled,
-		bufferToolContent:     !toolChoice.IsNone(),
+		bufferToolContent:     toolpolicy.ShouldBufferToolContent(toolChoice),
 		stripReferenceMarkers: stripReferenceMarkers,
 		toolNames:             toolNames,
 		toolsRaw:              toolsRaw,

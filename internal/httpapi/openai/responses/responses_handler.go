@@ -21,6 +21,7 @@ import (
 	"ds2api/internal/responsehistory"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
+	"ds2api/internal/toolpolicy"
 )
 
 func (h *Handler) GetResponseByID(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +193,7 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 	if thinkingEnabled {
 		initialType = "thinking"
 	}
-	bufferToolContent := !toolChoice.IsNone()
+	bufferToolContent := toolpolicy.ShouldBufferToolContent(toolChoice)
 	emitEarlyToolDeltas := h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence()
 	stripReferenceMarkers := stripReferenceMarkersEnabled()
 
