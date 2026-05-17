@@ -13,7 +13,6 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -140,7 +139,6 @@ func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Res
 		thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw,
 		toolChoice,
 		toolpolicy.ShouldBufferToolContent(toolChoice), h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
-		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	return streamRuntime, initialType, true
@@ -150,13 +148,14 @@ func (h *Handler) consumeChatStreamAttempt(r *http.Request, resp *http.Response,
 	defer func() { _ = resp.Body.Close() }()
 	finalReason := "stop"
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
-		IdleTimeout:         time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
-		MaxKeepAliveNoInput: dsprotocol.MaxKeepaliveCount,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
+		IdleTimeout:          time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
+		MaxKeepAliveNoInput:  dsprotocol.MaxKeepaliveCount,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnKeepAlive: streamRuntime.sendKeepAlive,
 		OnParsed: func(parsed sse.LineResult) streamengine.ParsedDecision {

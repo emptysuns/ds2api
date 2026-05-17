@@ -23,7 +23,13 @@ func TrimContinuationOverlap(existing, incoming string) string {
 		}
 		return incoming
 	}
-	if len(incoming) < len(existing) && strings.HasPrefix(existing, incoming) {
+	if len(incoming) == len(existing) {
+		if incoming == existing {
+			return ""
+		}
+		return incoming
+	}
+	if strings.HasPrefix(existing, incoming) {
 		return ""
 	}
 	return incoming
@@ -47,11 +53,15 @@ func TrimContinuationOverlapFromBuilder(existing *strings.Builder, incoming stri
 		}
 		return incoming
 	}
-	if len(incoming) < existingLen {
-		existingStr := existing.String()
-		if strings.HasPrefix(existingStr, incoming) {
+	existingStr := existing.String()
+	if len(incoming) == existingLen {
+		if incoming == existingStr {
 			return ""
 		}
+		return incoming
+	}
+	if strings.HasPrefix(existingStr, incoming) {
+		return ""
 	}
 	return incoming
 }

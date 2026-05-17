@@ -23,6 +23,24 @@ func TestTrimContinuationOverlapDropsStaleShorterSnapshot(t *testing.T) {
 	}
 }
 
+func TestTrimContinuationOverlapDropsIdenticalSnapshot(t *testing.T) {
+	existing := "我们被问到：这是一个很长的续答快照前缀，用来验证完全相同的快照不会重复输出。"
+	got := TrimContinuationOverlap(existing, existing)
+	if got != "" {
+		t.Fatalf("expected identical snapshot to be dropped, got %q", got)
+	}
+}
+
+func TestTrimContinuationOverlapFromBuilderDropsIdenticalSnapshot(t *testing.T) {
+	existing := "我们被问到：这是一个很长的续答快照前缀，用来验证 builder 路径也不会重复输出。"
+	var b strings.Builder
+	b.WriteString(existing)
+	got := TrimContinuationOverlapFromBuilder(&b, existing)
+	if got != "" {
+		t.Fatalf("expected identical builder snapshot to be dropped, got %q", got)
+	}
+}
+
 func TestTrimContinuationOverlapPreservesNormalIncrement(t *testing.T) {
 	existing := "我们"
 	incoming := "被"

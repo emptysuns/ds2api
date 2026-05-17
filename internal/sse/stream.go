@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"ds2api/internal/config"
 )
 
 const (
@@ -33,10 +35,14 @@ var productionAccumulate = AccumulateConfig{
 }
 
 func StartParsedLinePump(ctx context.Context, body io.Reader, thinkingEnabled bool, initialType string) (<-chan LineResult, <-chan error) {
-	return startParsedLinePumpWithConfig(ctx, body, thinkingEnabled, initialType, productionAccumulate)
+	return StartParsedLinePumpWithReplacements(ctx, body, thinkingEnabled, initialType, nil)
 }
 
-func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinkingEnabled bool, initialType string, cfg AccumulateConfig) (<-chan LineResult, <-chan error) {
+func StartParsedLinePumpWithReplacements(ctx context.Context, body io.Reader, thinkingEnabled bool, initialType string, replacements []config.ResponseReplacementRule) (<-chan LineResult, <-chan error) {
+	return startParsedLinePumpWithConfig(ctx, body, thinkingEnabled, initialType, productionAccumulate, replacements)
+}
+
+func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinkingEnabled bool, initialType string, cfg AccumulateConfig, replacements []config.ResponseReplacementRule) (<-chan LineResult, <-chan error) {
 	out := make(chan LineResult, parsedLineBufferSize)
 	done := make(chan error, 1)
 
@@ -45,6 +51,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 
 		reader := bufio.NewReaderSize(body, lineReaderBufferSize)
 		currentType := initialType
+		normalizer := NewContentNormalizer(replacements)
 
 		var pumpErr error
 
@@ -189,13 +196,63 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 			}
 		}
 
+		flushNormalizer := func() bool {
+			flushed := normalizer.Flush()
+			if len(flushed.Parts) == 0 && len(flushed.ToolDetectionThinkingParts) == 0 {
+				return true
+			}
+			if cfg.Enabled {
+				for _, p := range flushed.ToolDetectionThinkingParts {
+					toolDetectionThinkingBuffer.WriteString(p.Text)
+				}
+				for _, p := range flushed.Parts {
+					if p.Type == "thinking" {
+						if textBuffer.Len() > 0 {
+							flushBuffer(true)
+						}
+						thinkingBuffer.WriteString(p.Text)
+						thinkingPendingType = "thinking"
+					} else {
+						textBuffer.WriteString(p.Text)
+						textPendingType = p.Type
+					}
+				}
+				flushBuffer(true)
+				return pumpErr == nil
+			}
+			var parts []ContentPart
+			for _, p := range flushed.Parts {
+				if p.Type == "thinking" && !thinkingEnabled {
+					continue
+				}
+				parts = append(parts, p)
+			}
+			if len(parts) == 0 && len(flushed.ToolDetectionThinkingParts) == 0 {
+				return true
+			}
+			flushed.Parts = parts
+			select {
+			case out <- flushed:
+				return true
+			case <-ctx.Done():
+				pumpErr = ctx.Err()
+				return false
+			}
+		}
+
 		processLine := func(result LineResult) bool {
 			currentType = result.NextType
 			if result.ResponseMessageID > 0 {
 				pendingResponseMessageID = result.ResponseMessageID
 			}
+			if result.Parsed {
+				result = normalizer.Apply(result)
+			}
 
 			if result.Stop {
+				flushed := normalizer.Flush()
+				result.Parts = append(result.Parts, flushed.Parts...)
+				result.ToolDetectionThinkingParts = append(result.ToolDetectionThinkingParts, flushed.ToolDetectionThinkingParts...)
 				if cfg.Enabled && cfg.FlushOnFinish {
 					for _, p := range result.ToolDetectionThinkingParts {
 						toolDetectionThinkingBuffer.WriteString(p.Text)
@@ -348,6 +405,9 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 
 	done:
 		stopMaxWait()
+		if pumpErr == nil {
+			flushNormalizer()
+		}
 		if cfg.Enabled {
 			flushBuffer(true)
 		}

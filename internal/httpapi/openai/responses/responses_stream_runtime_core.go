@@ -11,7 +11,6 @@ import (
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -43,7 +42,6 @@ type responsesStreamRuntime struct {
 
 	sieve             toolstream.State
 	accumulator       shared.StreamAccumulator
-	responseReplacer  *responserewrite.StreamReplacer
 	visibleText       strings.Builder
 	responseMessageID int
 	streamToolCallIDs map[int]string
@@ -86,7 +84,6 @@ func newResponsesStreamRuntime(
 	traceID string,
 	persistResponse func(obj map[string]any),
 	history *responsehistory.Session,
-	responseReplacer *responserewrite.StreamReplacer,
 ) *responsesStreamRuntime {
 	return &responsesStreamRuntime{
 		w:                     w,
@@ -114,13 +111,11 @@ func newResponsesStreamRuntime(
 		traceID:               traceID,
 		persistResponse:       persistResponse,
 		history:               history,
-		responseReplacer:      responseReplacer,
 		accumulator: shared.StreamAccumulator{
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
 			PreserveToolMarkup:    !toolpolicy.ShouldParseToolCalls(toolChoice),
-			ResponseReplacer:      responseReplacer,
 		},
 	}
 }
@@ -168,14 +163,6 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 	s.finalErrorStatus = 0
 	s.finalErrorMessage = ""
 	s.finalErrorCode = ""
-	if s.responseReplacer != nil {
-		flushDelta := s.accumulator.FlushResponseReplacements()
-		if flushDelta.RawText != "" && s.bufferToolContent {
-			s.processToolStreamEvents(toolstream.ProcessChunk(&s.sieve, flushDelta.RawText, s.toolNames), true, true)
-		} else if flushDelta.VisibleText != "" {
-			s.emitTextDelta(flushDelta.VisibleText)
-		}
-	}
 	if s.bufferToolContent {
 		s.processToolStreamEvents(toolstream.Flush(&s.sieve, s.toolNames), true, true)
 	}

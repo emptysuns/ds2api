@@ -14,7 +14,6 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -43,20 +42,21 @@ func (h *Handler) handleStreamGenerateContent(w http.ResponseWriter, r *http.Req
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolChoice, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolChoice, historySession)
 
 	initialType := "text"
 	if thinkingEnabled {
 		initialType = "thinking"
 	}
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
-		IdleTimeout:         time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
-		MaxKeepAliveNoInput: dsprotocol.MaxKeepaliveCount,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
+		IdleTimeout:          time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
+		MaxKeepAliveNoInput:  dsprotocol.MaxKeepaliveCount,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnParsed: runtime.onParsed,
 		OnFinalize: func(_ streamengine.StopReason, _ error) {
@@ -83,7 +83,6 @@ type geminiStreamRuntime struct {
 	toolChoice            promptcompat.ToolChoicePolicy
 
 	accumulator       *assistantturn.Accumulator
-	responseReplacer  *responserewrite.StreamReplacer
 	contentFilter     bool
 	responseMessageID int
 	finalErrorStatus  int
@@ -110,7 +109,7 @@ func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r 
 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
-	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolChoice, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()))
+	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, toolChoice, historySession)
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
 		Surface:              "gemini.generate_content",
@@ -147,13 +146,14 @@ func (h *Handler) consumeGeminiStreamAttempt(ctx context.Context, resp *http.Res
 		initialType = "thinking"
 	}
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             ctx,
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
-		IdleTimeout:         time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
-		MaxKeepAliveNoInput: dsprotocol.MaxKeepaliveCount,
+		Context:              ctx,
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
+		IdleTimeout:          time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
+		MaxKeepAliveNoInput:  dsprotocol.MaxKeepaliveCount,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnParsed: runtime.onParsed,
 		OnFinalize: func(_ streamengine.StopReason, _ error) {
@@ -180,7 +180,6 @@ func newGeminiStreamRuntime(
 	toolsRaw any,
 	toolChoice promptcompat.ToolChoicePolicy,
 	history *responsehistory.Session,
-	responseReplacer *responserewrite.StreamReplacer,
 ) *geminiStreamRuntime {
 	return &geminiStreamRuntime{
 		w:                     w,
@@ -196,13 +195,11 @@ func newGeminiStreamRuntime(
 		toolsRaw:              toolsRaw,
 		toolChoice:            toolChoice,
 		history:               history,
-		responseReplacer:      responseReplacer,
 		accumulator: assistantturn.NewAccumulator(assistantturn.AccumulatorOptions{
 			ThinkingEnabled:       thinkingEnabled,
 			SearchEnabled:         searchEnabled,
 			StripReferenceMarkers: stripReferenceMarkers,
 			PreserveToolMarkup:    !toolpolicy.ShouldParseToolCalls(toolChoice),
-			ResponseReplacer:      responseReplacer,
 		}),
 	}
 }
@@ -314,10 +311,6 @@ func (s *geminiStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 
 //nolint:unused // retained for native Gemini stream handling path.
 func (s *geminiStreamRuntime) finalize(deferEmptyOutput bool) bool {
-	// Flush any pending response replacements before building the turn.
-	if s.responseReplacer != nil {
-		s.accumulator.FlushResponseReplacements()
-	}
 	rawText, text, rawThinking, thinking, detectionThinking := s.accumulator.Snapshot()
 	visibleText := text
 	visibleThinking := thinking

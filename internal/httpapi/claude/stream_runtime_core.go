@@ -8,7 +8,6 @@ import (
 
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -52,7 +51,6 @@ type claudeStreamRuntime struct {
 	ended              bool
 	upstreamErr        string
 	history            *responsehistory.Session
-	responseReplacer   *responserewrite.StreamReplacer
 }
 
 func newClaudeStreamRuntime(
@@ -69,7 +67,6 @@ func newClaudeStreamRuntime(
 	promptTokenText string,
 	toolChoice promptcompat.ToolChoicePolicy,
 	history *responsehistory.Session,
-	responseReplacer *responserewrite.StreamReplacer,
 ) *claudeStreamRuntime {
 	return &claudeStreamRuntime{
 		w:                     w,
@@ -86,7 +83,6 @@ func newClaudeStreamRuntime(
 		promptTokenText:       promptTokenText,
 		toolChoice:            toolChoice,
 		history:               history,
-		responseReplacer:      responseReplacer,
 		messageID:             fmt.Sprintf("msg_%d", time.Now().UnixNano()),
 		thinkingBlockIndex:    -1,
 		textBlockIndex:        -1,
@@ -121,13 +117,6 @@ func (s *claudeStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 			rawTrimmed = sse.TrimContinuationOverlapFromBuilder(&s.rawThinking, p.Text)
 		} else {
 			rawTrimmed = sse.TrimContinuationOverlapFromBuilder(&s.rawText, p.Text)
-		}
-		if rawTrimmed == "" {
-			continue
-		}
-		// Apply response replacements to text chunks.
-		if p.Type != "thinking" && s.responseReplacer != nil {
-			rawTrimmed = s.responseReplacer.Push(rawTrimmed)
 		}
 		if rawTrimmed == "" {
 			continue

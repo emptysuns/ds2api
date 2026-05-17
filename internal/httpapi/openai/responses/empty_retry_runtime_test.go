@@ -48,7 +48,6 @@ func TestConsumeResponsesStreamAttemptMarksContextCancelledState(t *testing.T) {
 		"",
 		nil,
 		nil,
-		nil, // responseReplacer
 	)
 	resp := makeResponsesOpenAISSEHTTPResponse(
 		`data: {"p":"response/content","v":"hello"}`,

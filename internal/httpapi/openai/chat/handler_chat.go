@@ -15,7 +15,6 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -241,18 +240,18 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, resp *htt
 		toolChoice,
 		bufferToolContent,
 		emitEarlyToolDeltas,
-		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
-		IdleTimeout:         time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
-		MaxKeepAliveNoInput: dsprotocol.MaxKeepaliveCount,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
+		IdleTimeout:          time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
+		MaxKeepAliveNoInput:  dsprotocol.MaxKeepaliveCount,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnKeepAlive: func() {
 			streamRuntime.sendKeepAlive()

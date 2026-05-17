@@ -3,7 +3,6 @@ package shared
 import (
 	"strings"
 
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 )
 
@@ -12,8 +11,6 @@ type StreamAccumulator struct {
 	SearchEnabled         bool
 	StripReferenceMarkers bool
 	PreserveToolMarkup    bool
-
-	ResponseReplacer *responserewrite.StreamReplacer
 
 	RawThinking           strings.Builder
 	Thinking              strings.Builder
@@ -91,11 +88,6 @@ func (a *StreamAccumulator) applyTextPart(text string) StreamPartDelta {
 	if rawTrimmed == "" {
 		return StreamPartDelta{Type: "text"}
 	}
-	// Apply response replacements before accumulating raw text.
-	rawTrimmed = a.replaceResponseText(rawTrimmed)
-	if rawTrimmed == "" {
-		return StreamPartDelta{Type: "text"}
-	}
 	a.RawText.WriteString(rawTrimmed)
 	delta := StreamPartDelta{Type: "text", RawText: rawTrimmed}
 	if a.SearchEnabled && sse.IsCitation(rawTrimmed) {
@@ -109,40 +101,5 @@ func (a *StreamAccumulator) applyTextPart(text string) StreamPartDelta {
 	}
 	a.Text.WriteString(trimmed)
 	delta.VisibleText = trimmed
-	return delta
-}
-
-// replaceResponseText applies stream replacements to the given text chunk.
-// Returns the replaced text, which may be empty if the chunk was fully consumed
-// by the stream replacer's lookahead buffer.
-func (a *StreamAccumulator) replaceResponseText(text string) string {
-	if a.ResponseReplacer == nil {
-		return text
-	}
-	return a.ResponseReplacer.Push(text)
-}
-
-// FlushResponseReplacements flushes any remaining text buffered in the
-// stream replacer and appends it to RawText and Text builders. Returns a
-// delta for the flushed text (may be empty if nothing was pending).
-func (a *StreamAccumulator) FlushResponseReplacements() StreamPartDelta {
-	if a.ResponseReplacer == nil {
-		return StreamPartDelta{Type: "text"}
-	}
-	flushed := a.ResponseReplacer.Flush()
-	if flushed == "" {
-		return StreamPartDelta{Type: "text"}
-	}
-	a.RawText.WriteString(flushed)
-	cleanedText := CleanVisibleOutputWithPolicy(flushed, a.StripReferenceMarkers, a.PreserveToolMarkup)
-	trimmed := sse.TrimContinuationOverlapFromBuilder(&a.Text, cleanedText)
-	delta := StreamPartDelta{Type: "text", RawText: flushed}
-	if trimmed != "" {
-		a.Text.WriteString(trimmed)
-		delta.VisibleText = trimmed
-	}
-	if a.SearchEnabled && sse.IsCitation(flushed) {
-		delta.CitationOnly = true
-	}
 	return delta
 }

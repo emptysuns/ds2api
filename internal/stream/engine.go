@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"ds2api/internal/config"
 	"ds2api/internal/sse"
 )
 
@@ -20,13 +21,14 @@ const (
 )
 
 type ConsumeConfig struct {
-	Context             context.Context
-	Body                io.Reader
-	ThinkingEnabled     bool
-	InitialType         string
-	KeepAliveInterval   time.Duration
-	IdleTimeout         time.Duration
-	MaxKeepAliveNoInput int
+	Context              context.Context
+	Body                 io.Reader
+	ThinkingEnabled      bool
+	InitialType          string
+	KeepAliveInterval    time.Duration
+	IdleTimeout          time.Duration
+	MaxKeepAliveNoInput  int
+	ResponseReplacements []config.ResponseReplacementRule
 }
 
 type ParsedDecision struct {
@@ -54,7 +56,7 @@ func ConsumeSSE(cfg ConsumeConfig, hooks ConsumeHooks) {
 			initialType = "text"
 		}
 	}
-	parsedLines, done := sse.StartParsedLinePump(cfg.Context, cfg.Body, cfg.ThinkingEnabled, initialType)
+	parsedLines, done := sse.StartParsedLinePumpWithReplacements(cfg.Context, cfg.Body, cfg.ThinkingEnabled, initialType, cfg.ResponseReplacements)
 
 	var ticker *time.Ticker
 	if cfg.KeepAliveInterval > 0 {

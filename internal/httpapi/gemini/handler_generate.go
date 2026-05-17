@@ -332,7 +332,7 @@ func (h *Handler) handleNonStreamGenerateContent(w http.ResponseWriter, resp *ht
 		return
 	}
 
-	result := sse.CollectStream(resp, thinkingEnabled, true)
+	result := sse.CollectStreamWithReplacements(resp, thinkingEnabled, true, h.responseReplacementRules())
 	writeJSON(w, http.StatusOK, buildGeminiGenerateContentResponse(
 		model,
 		finalPrompt,

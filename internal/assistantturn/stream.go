@@ -2,7 +2,6 @@ package assistantturn
 
 import (
 	"ds2api/internal/httpapi/openai/shared"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 )
 
@@ -35,7 +34,6 @@ type AccumulatorOptions struct {
 	SearchEnabled         bool
 	StripReferenceMarkers bool
 	PreserveToolMarkup    bool
-	ResponseReplacer      *responserewrite.StreamReplacer
 }
 
 func NewAccumulator(opts AccumulatorOptions) *Accumulator {
@@ -45,7 +43,6 @@ func NewAccumulator(opts AccumulatorOptions) *Accumulator {
 			SearchEnabled:         opts.SearchEnabled,
 			StripReferenceMarkers: opts.StripReferenceMarkers,
 			PreserveToolMarkup:    opts.PreserveToolMarkup,
-			ResponseReplacer:      opts.ResponseReplacer,
 		},
 	}
 }
@@ -55,13 +52,6 @@ func (a *Accumulator) Apply(parsed sse.LineResult) shared.StreamAccumulatorResul
 		return shared.StreamAccumulatorResult{}
 	}
 	return a.inner.Apply(parsed)
-}
-
-func (a *Accumulator) FlushResponseReplacements() {
-	if a == nil {
-		return
-	}
-	a.inner.FlushResponseReplacements()
 }
 
 func (a *Accumulator) Snapshot() (rawText, text, rawThinking, thinking, detectionThinking string) {

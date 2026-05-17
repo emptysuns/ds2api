@@ -192,7 +192,11 @@ func (h *Handler) testAccount(ctx context.Context, acc config.Account, model, me
 		result["message"] = fmt.Sprintf("请求失败: HTTP %d", resp.StatusCode)
 		return result
 	}
-	collected := sse.CollectStream(resp, thinking, true)
+	var replacements []config.ResponseReplacementRule
+	if h.Store != nil && h.Store.ResponseReplacementsEnabled() {
+		replacements = h.Store.ResponseReplacementRules()
+	}
+	collected := sse.CollectStreamWithReplacements(resp, thinking, true, replacements)
 	result["success"] = true
 	result["response_time"] = int(time.Since(start).Milliseconds())
 	if collected.Text != "" {

@@ -19,7 +19,6 @@ import (
 	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/sse"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
@@ -152,7 +151,7 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 		writeOpenAIError(w, resp.StatusCode, strings.TrimSpace(string(body)))
 		return
 	}
-	result := sse.CollectStream(resp, thinkingEnabled, true)
+	result := sse.CollectStreamWithReplacements(resp, thinkingEnabled, true, h.responseReplacementRules())
 
 	turn := assistantturn.BuildTurnFromCollected(result, assistantturn.BuildOptions{
 		Model:         model,
@@ -218,19 +217,19 @@ func (h *Handler) handleResponsesStream(w http.ResponseWriter, r *http.Request, 
 			h.getResponseStore().put(owner, responseID, obj)
 		},
 		nil,
-		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	streamRuntime.sendCreated()
 
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
-		IdleTimeout:         time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
-		MaxKeepAliveNoInput: dsprotocol.MaxKeepaliveCount,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
+		IdleTimeout:          time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
+		MaxKeepAliveNoInput:  dsprotocol.MaxKeepaliveCount,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnParsed: streamRuntime.onParsed,
 		OnFinalize: func(reason streamengine.StopReason, _ error) {

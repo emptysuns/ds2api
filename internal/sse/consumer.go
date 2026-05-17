@@ -6,7 +6,6 @@ import (
 
 	"ds2api/internal/config"
 	dsprotocol "ds2api/internal/deepseek/protocol"
-	"ds2api/internal/responserewrite"
 	"ds2api/internal/util"
 )
 
@@ -44,10 +43,26 @@ func CollectStreamWithReplacements(resp *http.Response, thinkingEnabled bool, cl
 	contentFilter := false
 	stopped := false
 	collector := newCitationLinkCollector()
+	normalizer := NewContentNormalizer(replacements)
 	responseMessageID := 0
 	currentType := "text"
 	if thinkingEnabled {
 		currentType = "thinking"
+	}
+	appendResult := func(result LineResult) {
+		for _, p := range result.Parts {
+			if p.Type == "thinking" {
+				thinking.WriteString(p.Text)
+			} else {
+				text.WriteString(p.Text)
+			}
+		}
+		for _, p := range result.ToolDetectionThinkingParts {
+			toolDetectionThinking.WriteString(p.Text)
+		}
+	}
+	flushNormalizer := func() {
+		appendResult(normalizer.Flush())
 	}
 	_ = dsprotocol.ScanSSELines(resp, func(line []byte) bool {
 		chunk, done, parsed := ParseDeepSeekSSELine(line)
@@ -56,6 +71,7 @@ func CollectStreamWithReplacements(resp *http.Response, thinkingEnabled bool, cl
 			observeResponseMessageID(chunk, &responseMessageID)
 		}
 		if done {
+			flushNormalizer()
 			return false
 		}
 		if stopped {
@@ -66,34 +82,22 @@ func CollectStreamWithReplacements(resp *http.Response, thinkingEnabled bool, cl
 		if !result.Parsed {
 			return true
 		}
+		result = normalizer.Apply(result)
 		if result.Stop {
 			if result.ContentFilter {
 				contentFilter = true
 			}
+			flushNormalizer()
 			// Keep scanning to collect late-arriving citation metadata lines
 			// that can appear after response/status=FINISHED, but stop as soon
 			// as [DONE] arrives.
 			stopped = true
 			return true
 		}
-		for _, p := range result.Parts {
-			if p.Type == "thinking" {
-				trimmed := TrimContinuationOverlap(thinking.String(), p.Text)
-				trimmed = responserewrite.Apply(trimmed, replacements)
-				thinking.WriteString(trimmed)
-			} else {
-				trimmed := TrimContinuationOverlap(text.String(), p.Text)
-				trimmed = responserewrite.Apply(trimmed, replacements)
-				text.WriteString(trimmed)
-			}
-		}
-		for _, p := range result.ToolDetectionThinkingParts {
-			trimmed := TrimContinuationOverlap(toolDetectionThinking.String(), p.Text)
-			trimmed = responserewrite.Apply(trimmed, replacements)
-			toolDetectionThinking.WriteString(trimmed)
-		}
+		appendResult(result)
 		return true
 	})
+	flushNormalizer()
 	return CollectResult{
 		Text:                  text.String(),
 		Thinking:              thinking.String(),

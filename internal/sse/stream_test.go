@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"ds2api/internal/config"
+	"ds2api/internal/responserewrite"
 )
 
 func makeLargeContentSSEBody(t *testing.T, payload string) string {
@@ -64,5 +67,35 @@ func TestStartParsedLinePumpHandlesLongSingleSSELine(t *testing.T) {
 	}
 	if !sawDone {
 		t.Fatal("expected DONE after long SSE line")
+	}
+}
+
+func TestStartParsedLinePumpWithReplacementsDedupesSourceSnapshots(t *testing.T) {
+	rules := []config.ResponseReplacementRule{
+		{From: "<|DEML", To: "<|DSML"},
+		{From: "</|DEML", To: "</|DSML"},
+	}
+	text := `<|DEML|tool_calls>
+  <|DEML|invoke name="mcp__exa__web_search_exa">
+    <|DEML|parameter name="query"><![CDATA[2026年5月17日 原油价格 WTI Brent]]></|DEML|parameter>
+    <|DEML|parameter name="numResults"><![CDATA[5]]></|DEML|parameter>
+  </|DEML|invoke>
+</|DEML|tool_calls>`
+	line := strings.TrimSuffix(makeLargeContentSSEBody(t, text), "data: [DONE]\n")
+	body := line + line + "data: [DONE]\n"
+	results, done := StartParsedLinePumpWithReplacements(context.Background(), strings.NewReader(body), false, "text", rules)
+
+	var got strings.Builder
+	for r := range results {
+		for _, p := range r.Parts {
+			got.WriteString(p.Text)
+		}
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("unexpected scanner error: %v", err)
+	}
+	want := responserewrite.Apply(text, rules)
+	if got.String() != want {
+		t.Fatalf("normalized text = %q, want %q", got.String(), want)
 	}
 }

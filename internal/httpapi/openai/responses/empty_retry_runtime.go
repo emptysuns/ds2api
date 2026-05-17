@@ -12,7 +12,6 @@ import (
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
-	"ds2api/internal/responserewrite"
 	streamengine "ds2api/internal/stream"
 	"ds2api/internal/toolpolicy"
 )
@@ -81,7 +80,7 @@ func (h *Handler) prepareResponsesStreamRuntime(w http.ResponseWriter, resp *htt
 		h.toolcallFeatureMatchEnabled() && h.toolcallEarlyEmitHighConfidence(),
 		toolChoice, traceID, func(obj map[string]any) {
 			h.getResponseStore().put(owner, responseID, obj)
-		}, historySession, responserewrite.NewStreamReplacer(h.responseReplacementRules()),
+		}, historySession,
 	)
 	streamRuntime.refFileTokens = refFileTokens
 	streamRuntime.sendCreated()
@@ -92,13 +91,14 @@ func (h *Handler) consumeResponsesStreamAttempt(r *http.Request, resp *http.Resp
 	defer func() { _ = resp.Body.Close() }()
 	finalReason := "stop"
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
-		IdleTimeout:         time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
-		MaxKeepAliveNoInput: dsprotocol.MaxKeepaliveCount,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    time.Duration(dsprotocol.KeepAliveTimeout) * time.Second,
+		IdleTimeout:          time.Duration(dsprotocol.StreamIdleTimeout) * time.Second,
+		MaxKeepAliveNoInput:  dsprotocol.MaxKeepaliveCount,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnParsed: streamRuntime.onParsed,
 		OnFinalize: func(reason streamengine.StopReason, _ error) {

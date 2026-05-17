@@ -341,7 +341,6 @@ func (h *Handler) handleClaudeStreamRealtime(w http.ResponseWriter, r *http.Requ
 		buildClaudePromptTokenText(messages, thinkingEnabled),
 		toolChoice,
 		historySession,
-		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.sendMessageStart()
 
@@ -350,13 +349,14 @@ func (h *Handler) handleClaudeStreamRealtime(w http.ResponseWriter, r *http.Requ
 		initialType = "thinking"
 	}
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   claudeStreamPingInterval,
-		IdleTimeout:         claudeStreamIdleTimeout,
-		MaxKeepAliveNoInput: claudeStreamMaxKeepaliveCnt,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    claudeStreamPingInterval,
+		IdleTimeout:          claudeStreamIdleTimeout,
+		MaxKeepAliveNoInput:  claudeStreamMaxKeepaliveCnt,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnKeepAlive: func() {
 			streamRuntime.sendPing()
@@ -401,7 +401,6 @@ func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *
 		promptTokenText,
 		toolChoice,
 		historySession,
-		responserewrite.NewStreamReplacer(h.responseReplacementRules()),
 	)
 	streamRuntime.sendMessageStart()
 
@@ -442,13 +441,14 @@ func (h *Handler) consumeClaudeStreamAttempt(r *http.Request, resp *http.Respons
 	finalReason := streamengine.StopReason("")
 	var scannerErr error
 	streamengine.ConsumeSSE(streamengine.ConsumeConfig{
-		Context:             r.Context(),
-		Body:                resp.Body,
-		ThinkingEnabled:     thinkingEnabled,
-		InitialType:         initialType,
-		KeepAliveInterval:   claudeStreamPingInterval,
-		IdleTimeout:         claudeStreamIdleTimeout,
-		MaxKeepAliveNoInput: claudeStreamMaxKeepaliveCnt,
+		Context:              r.Context(),
+		Body:                 resp.Body,
+		ThinkingEnabled:      thinkingEnabled,
+		InitialType:          initialType,
+		KeepAliveInterval:    claudeStreamPingInterval,
+		IdleTimeout:          claudeStreamIdleTimeout,
+		MaxKeepAliveNoInput:  claudeStreamMaxKeepaliveCnt,
+		ResponseReplacements: h.responseReplacementRules(),
 	}, streamengine.ConsumeHooks{
 		OnKeepAlive: func() {
 			streamRuntime.sendPing()
