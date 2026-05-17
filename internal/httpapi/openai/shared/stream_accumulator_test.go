@@ -6,7 +6,7 @@ import (
 	"ds2api/internal/sse"
 )
 
-func TestStreamAccumulatorAppliesThinkingAndTextDedupe(t *testing.T) {
+func TestStreamAccumulatorSuppressesLateVisibleThinkingAfterText(t *testing.T) {
 	acc := StreamAccumulator{ThinkingEnabled: true, StripReferenceMarkers: true}
 	thinkingPrefix := "this is a long thinking snapshot prefix used by DeepSeek continue replay"
 	textPrefix := "this is a long visible answer snapshot prefix used by DeepSeek continue replay"
@@ -31,8 +31,8 @@ func TestStreamAccumulatorAppliesThinkingAndTextDedupe(t *testing.T) {
 	if got := acc.RawThinking.String(); got != thinkingPrefix+" next" {
 		t.Fatalf("raw thinking = %q", got)
 	}
-	if got := acc.Thinking.String(); got != thinkingPrefix+" next" {
-		t.Fatalf("thinking = %q", got)
+	if got := acc.Thinking.String(); got != thinkingPrefix {
+		t.Fatalf("visible thinking = %q", got)
 	}
 	if got := acc.RawText.String(); got != textPrefix+" world" {
 		t.Fatalf("raw text = %q", got)
@@ -40,8 +40,8 @@ func TestStreamAccumulatorAppliesThinkingAndTextDedupe(t *testing.T) {
 	if got := acc.Text.String(); got != textPrefix+" world" {
 		t.Fatalf("text = %q", got)
 	}
-	if got := second.Parts[0].VisibleText; got != " next" {
-		t.Fatalf("thinking delta = %q", got)
+	if got := second.Parts[0].VisibleText; got != "" {
+		t.Fatalf("late thinking delta should be hidden, got %q", got)
 	}
 	if got := second.Parts[1].VisibleText; got != " world" {
 		t.Fatalf("text delta = %q", got)

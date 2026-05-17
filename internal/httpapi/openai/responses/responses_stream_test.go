@@ -39,6 +39,39 @@ func TestHandleResponsesStreamDoesNotEmitReasoningTextCompatEvents(t *testing.T)
 	}
 }
 
+func TestHandleResponsesStreamSuppressesLateReasoningAfterText(t *testing.T) {
+	h := &Handler{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	rec := httptest.NewRecorder()
+	sseLine := func(kind, text string) string {
+		b, _ := json.Marshal(map[string]any{
+			"p": "response/fragments",
+			"o": "APPEND",
+			"v": []map[string]any{{"type": kind, "content": text}},
+		})
+		return "data: " + string(b) + "\n"
+	}
+	streamBody := sseLine("THINK", "先想") + sseLine("RESPONSE", "你好") + sseLine("THINK", "补想") + sseLine("RESPONSE", "吗") + "data: [DONE]\n"
+	resp := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(streamBody))}
+
+	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+
+	var reasoning strings.Builder
+	for _, payload := range extractSSEEventPayloads(rec.Body.String(), "response.reasoning.delta") {
+		reasoning.WriteString(asString(payload["delta"]))
+	}
+	var text strings.Builder
+	for _, payload := range extractSSEEventPayloads(rec.Body.String(), "response.output_text.delta") {
+		text.WriteString(asString(payload["delta"]))
+	}
+	if got := reasoning.String(); got != "先想" {
+		t.Fatalf("unexpected reasoning stream: got %q body=%s", got, rec.Body.String())
+	}
+	if got := text.String(); got != "你好吗" {
+		t.Fatalf("unexpected text stream: got %q body=%s", got, rec.Body.String())
+	}
+}
+
 func TestHandleResponsesStreamEmitsOutputTextDoneBeforeContentPartDone(t *testing.T) {
 	h := &Handler{}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)

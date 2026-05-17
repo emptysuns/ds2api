@@ -136,7 +136,7 @@ func (s *claudeStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Parse
 		contentSeen = true
 
 		if p.Type == "thinking" {
-			if !s.thinkingEnabled {
+			if !s.thinkingEnabled || s.rawText.Len() > 0 {
 				continue
 			}
 			trimmed := sse.TrimContinuationOverlapFromBuilder(&s.thinking, cleanedText)

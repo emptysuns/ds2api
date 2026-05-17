@@ -431,6 +431,39 @@ func TestNativeStreamGenerateContentEmitsThoughtParts(t *testing.T) {
 	}
 }
 
+func TestNativeStreamGenerateContentSuppressesLateThoughtAfterText(t *testing.T) {
+	h := &Handler{}
+	resp := makeGeminiUpstreamResponse(
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"THINK","content":"先想"}]}`,
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"RESPONSE","content":"你好"}]}`,
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"THINK","content":"补想"}]}`,
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"RESPONSE","content":"吗"}]}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-pro:streamGenerateContent", nil)
+
+	h.handleStreamGenerateContent(rec, req, resp, "gemini-2.5-pro", "prompt", true, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
+
+	frames := extractGeminiSSEFrames(t, rec.Body.String())
+	var gotThought, gotText string
+	for _, frame := range frames {
+		for _, part := range geminiPartsFromFrame(frame) {
+			if part["thought"] == true {
+				gotThought += asString(part["text"])
+			} else {
+				gotText += asString(part["text"])
+			}
+		}
+	}
+	if gotThought != "先想" {
+		t.Fatalf("unexpected thought stream: got %q body=%s", gotThought, rec.Body.String())
+	}
+	if !strings.Contains(gotText, "你好吗") {
+		t.Fatalf("unexpected text stream: got %q body=%s", gotText, rec.Body.String())
+	}
+}
+
 func TestNativeStreamGenerateContentDetectsToolUseWithoutDeclaredTools(t *testing.T) {
 	h := &Handler{}
 	resp := makeGeminiUpstreamResponse(

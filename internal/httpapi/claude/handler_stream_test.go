@@ -210,6 +210,36 @@ func TestHandleClaudeStreamRealtimeThinkingDelta(t *testing.T) {
 	}
 }
 
+func TestHandleClaudeStreamRealtimeSuppressesLateThinkingAfterText(t *testing.T) {
+	h := &Handler{}
+	resp := makeClaudeSSEHTTPResponse(
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"THINK","content":"先想"}]}`,
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"RESPONSE","content":"你好"}]}`,
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"THINK","content":"补想"}]}`,
+		`data: {"p":"response/fragments","o":"APPEND","v":[{"type":"RESPONSE","content":"吗"}]}`,
+		`data: [DONE]`,
+	)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", nil)
+
+	h.handleClaudeStreamRealtime(rec, req, resp, "claude-sonnet-4-5", []any{map[string]any{"role": "user", "content": "hi"}}, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy())
+
+	frames := parseClaudeFrames(t, rec.Body.String())
+	if got := collectClaudeTextDeltas(frames); got != "你好吗" {
+		t.Fatalf("unexpected text deltas: got %q body=%s", got, rec.Body.String())
+	}
+	var thinking strings.Builder
+	for _, f := range findClaudeFrames(frames, "content_block_delta") {
+		delta, _ := f.Payload["delta"].(map[string]any)
+		if delta["type"] == "thinking_delta" {
+			thinking.WriteString(asString(delta["thinking"]))
+		}
+	}
+	if got := thinking.String(); got != "先想" {
+		t.Fatalf("unexpected thinking deltas: got %q body=%s", got, rec.Body.String())
+	}
+}
+
 func TestHandleClaudeStreamRealtimeSkipsThinkingFallbackWhenFinalTextExists(t *testing.T) {
 	h := &Handler{}
 	resp := makeClaudeSSEHTTPResponse(

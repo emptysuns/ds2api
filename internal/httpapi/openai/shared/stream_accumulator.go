@@ -67,7 +67,7 @@ func (a *StreamAccumulator) applyThinkingPart(text string) StreamPartDelta {
 		a.RawThinking.WriteString(rawTrimmed)
 	}
 	delta := StreamPartDelta{Type: "thinking", RawText: rawTrimmed}
-	if !a.ThinkingEnabled || rawTrimmed == "" {
+	if !a.ThinkingEnabled || rawTrimmed == "" || a.RawText.Len() > 0 {
 		return delta
 	}
 	cleanedText := CleanVisibleOutputWithPolicy(rawTrimmed, a.StripReferenceMarkers, a.PreserveToolMarkup)
