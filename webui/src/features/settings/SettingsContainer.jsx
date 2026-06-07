@@ -8,6 +8,7 @@ import BehaviorSection from './BehaviorSection'
 import CurrentInputFileSection from './CurrentInputFileSection'
 import PromptSection from './PromptSection'
 import AutoDeleteSection from './AutoDeleteSection'
+import BannedAccountSection from './BannedAccountSection'
 import ClientSection from './ClientSection'
 import ModelSection from './ModelSection'
 import BackupSection from './BackupSection'
@@ -102,6 +103,15 @@ export default function SettingsContainer({ onRefresh, onMessage, authFetch, onF
             <PromptSection t={t} form={form} setForm={setForm} />
 
             <AutoDeleteSection t={t} form={form} setForm={setForm} />
+
+            <BannedAccountSection
+                t={t}
+                form={form}
+                setForm={setForm}
+                apiFetch={apiFetch}
+                onMessage={onMessage}
+                onRefresh={onRefresh}
+            />
 
             <ClientSection t={t} form={form} setForm={setForm} />
 

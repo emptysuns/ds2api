@@ -68,6 +68,9 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			if runtimeCfg.TokenRefreshIntervalHours > 0 {
 				c.Runtime.TokenRefreshIntervalHours = runtimeCfg.TokenRefreshIntervalHours
 			}
+			if runtimeCfg.AutoCleanBanned != nil {
+				c.Runtime.AutoCleanBanned = runtimeCfg.AutoCleanBanned
+			}
 		}
 		if responsesCfg != nil && responsesCfg.StoreTTLSeconds > 0 {
 			c.Responses.StoreTTLSeconds = responsesCfg.StoreTTLSeconds

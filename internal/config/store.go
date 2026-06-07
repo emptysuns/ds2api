@@ -11,13 +11,14 @@ import (
 )
 
 type Store struct {
-	mu      sync.RWMutex
-	cfg     Config
-	path    string
-	fromEnv bool
-	keyMap  map[string]struct{} // O(1) API key lookup index
-	accMap  map[string]int      // O(1) account lookup: identifier -> slice index
-	accTest map[string]string   // runtime-only account test status cache
+	mu        sync.RWMutex
+	cfg       Config
+	path      string
+	fromEnv   bool
+	keyMap    map[string]struct{} // O(1) API key lookup index
+	accMap    map[string]int      // O(1) account lookup: identifier -> slice index
+	accTest   map[string]string   // runtime-only account test status cache
+	accBanned map[string]bool     // runtime-only banned account tracking
 }
 
 func LoadStore() *Store {
@@ -235,6 +236,74 @@ func (s *Store) AccountTestStatus(identifier string) (string, bool) {
 	defer s.mu.RUnlock()
 	status, ok := s.accTest[identifier]
 	return status, ok
+}
+
+// UpdateAccountBannedStatus marks or unmarks an account as banned.
+func (s *Store) UpdateAccountBannedStatus(identifier string, banned bool) {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.accBanned == nil {
+		s.accBanned = map[string]bool{}
+	}
+	s.accBanned[identifier] = banned
+}
+
+// AccountBannedStatus returns whether an account is marked as banned.
+func (s *Store) AccountBannedStatus(identifier string) bool {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.accBanned[identifier]
+}
+
+// BannedAccountIdentifiers returns a list of all currently banned account identifiers.
+func (s *Store) BannedAccountIdentifiers() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var ids []string
+	for id, banned := range s.accBanned {
+		if banned {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// RemoveBannedAccounts removes all accounts marked as banned from the config.
+// Returns the list of removed account identifiers.
+func (s *Store) RemoveBannedAccounts() ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.accBanned) == 0 {
+		return nil, nil
+	}
+	var removed []string
+	kept := make([]Account, 0, len(s.cfg.Accounts))
+	for _, acc := range s.cfg.Accounts {
+		id := acc.Identifier()
+		if id != "" && s.accBanned[id] {
+			removed = append(removed, id)
+			delete(s.accBanned, id)
+			continue
+		}
+		kept = append(kept, acc)
+	}
+	if len(removed) == 0 {
+		return nil, nil
+	}
+	s.cfg.Accounts = kept
+	s.rebuildIndexes()
+	if err := s.saveLocked(); err != nil {
+		return removed, err
+	}
+	return removed, nil
 }
 
 func (s *Store) UpdateAccountToken(identifier, token string) error {

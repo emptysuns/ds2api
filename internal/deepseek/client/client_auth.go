@@ -58,10 +58,18 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 	}
 	code := intFrom(resp["code"])
 	if code != 0 {
+		msg, _ := resp["msg"].(string)
+		if isBannedError(msg) {
+			return "", &RequestFailure{Op: "login", Kind: FailureBanned, Message: msg}
+		}
 		return "", fmt.Errorf("login failed: %v", resp["msg"])
 	}
 	data, _ := resp["data"].(map[string]any)
 	if intFrom(data["biz_code"]) != 0 {
+		bizMsg, _ := data["biz_msg"].(string)
+		if isBannedError(bizMsg) {
+			return "", &RequestFailure{Op: "login", Kind: FailureBanned, Message: bizMsg}
+		}
 		return "", fmt.Errorf("login failed: %v", data["biz_msg"])
 	}
 	bizData, _ := data["biz_data"].(map[string]any)
@@ -251,6 +259,25 @@ func isAuthIndicativeBizFailure(msg string, bizMsg string) bool {
 		"令牌",
 	}
 	for _, keyword := range authKeywords {
+		if strings.Contains(combined, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// isBannedError checks whether the login response indicates the account is banned.
+func isBannedError(msg string) bool {
+	combined := strings.ToLower(strings.TrimSpace(msg))
+	bannedKeywords := []string{
+		"user_is_banned",
+		"user is banned",
+		"banned",
+		"封禁",
+		"被封禁",
+		"账号已封禁",
+	}
+	for _, keyword := range bannedKeywords {
 		if strings.Contains(combined, keyword) {
 			return true
 		}

@@ -11,6 +11,7 @@ const (
 	FailureUnknown             FailureKind = ""
 	FailureDirectUnauthorized  FailureKind = "direct_unauthorized"
 	FailureManagedUnauthorized FailureKind = "managed_unauthorized"
+	FailureBanned              FailureKind = "banned"
 )
 
 type RequestFailure struct {
@@ -43,4 +44,9 @@ func IsManagedUnauthorizedError(err error) bool {
 func IsDirectUnauthorizedError(err error) bool {
 	var failure *RequestFailure
 	return errors.As(err, &failure) && failure.Kind == FailureDirectUnauthorized
+}
+
+func IsBannedError(err error) bool {
+	var failure *RequestFailure
+	return errors.As(err, &failure) && failure.Kind == FailureBanned
 }

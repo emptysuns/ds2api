@@ -13,6 +13,7 @@ import (
 
 	authn "ds2api/internal/auth"
 	"ds2api/internal/config"
+	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/prompt"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
@@ -118,6 +119,12 @@ func (h *Handler) testAccount(ctx context.Context, acc config.Account, model, me
 	}()
 	token, err := h.DS.Login(ctx, acc)
 	if err != nil {
+		if dsclient.IsBannedError(err) {
+			h.Store.UpdateAccountBannedStatus(identifier, true)
+			_ = h.Store.UpdateAccountTestStatus(identifier, "banned")
+			result["message"] = "登录失败: 账号已被封禁 (" + err.Error() + ")"
+			return result
+		}
 		result["message"] = "登录失败: " + err.Error()
 		return result
 	}
@@ -254,6 +261,30 @@ func (h *Handler) testAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": false, "status_code": resp.StatusCode, "response": string(body)})
+}
+
+func (h *Handler) cleanBannedAccounts(w http.ResponseWriter, _ *http.Request) {
+	removed, err := h.Store.RemoveBannedAccounts()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"detail": err.Error()})
+		return
+	}
+	if len(removed) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success": true,
+			"message": "没有发现被封禁的账号",
+			"removed": 0,
+		})
+		return
+	}
+	h.Pool.Reset()
+	config.Logger.Info("[clean_banned] removed banned accounts", "count", len(removed), "accounts", removed)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":  true,
+		"message":  fmt.Sprintf("已清理 %d 个被封禁的账号", len(removed)),
+		"removed":  len(removed),
+		"accounts": removed,
+	})
 }
 
 func (h *Handler) deleteAllSessions(w http.ResponseWriter, r *http.Request) {

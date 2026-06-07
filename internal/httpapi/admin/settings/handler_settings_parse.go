@@ -77,6 +77,10 @@ func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *confi
 			}
 			cfg.TokenRefreshIntervalHours = n
 		}
+		if v, exists := raw["auto_clean_banned"]; exists {
+			b := boolFrom(v)
+			cfg.AutoCleanBanned = &b
+		}
 		if cfg.AccountMaxInflight > 0 && cfg.GlobalMaxInflight > 0 && cfg.GlobalMaxInflight < cfg.AccountMaxInflight {
 			return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("runtime.global_max_inflight must be >= runtime.account_max_inflight")
 		}

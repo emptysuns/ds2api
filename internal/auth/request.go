@@ -155,12 +155,31 @@ func FromContext(ctx context.Context) (*RequestAuth, bool) {
 func (r *Resolver) loginAndPersist(ctx context.Context, a *RequestAuth) error {
 	token, err := r.Login(ctx, a.Account)
 	if err != nil {
+		if isBannedLoginError(err) {
+			config.Logger.Warn("[login] account is banned", "account", a.AccountID, "error", err)
+			r.Store.UpdateAccountBannedStatus(a.AccountID, true)
+			_ = r.Store.UpdateAccountTestStatus(a.AccountID, "banned")
+		}
 		return err
 	}
 	a.Account.Token = token
 	a.DeepSeekToken = token
 	r.markTokenRefreshedNow(a.AccountID)
 	return r.Store.UpdateAccountToken(a.AccountID, token)
+}
+
+// isBannedLoginError checks if the login error indicates the account is banned.
+func isBannedLoginError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "user_is_banned") ||
+		strings.Contains(msg, "user is banned") ||
+		strings.Contains(msg, "banned") ||
+		strings.Contains(msg, "封禁") ||
+		strings.Contains(msg, "被封禁") ||
+		strings.Contains(msg, "账号已封禁")
 }
 
 func (r *Resolver) RefreshToken(ctx context.Context, a *RequestAuth) bool {

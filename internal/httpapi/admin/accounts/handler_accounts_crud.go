@@ -58,6 +58,7 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 	for _, acc := range accounts[start:end] {
 		testStatus, _ := h.Store.AccountTestStatus(acc.Identifier())
 		token := strings.TrimSpace(acc.Token)
+		banned := h.Store.AccountBannedStatus(acc.Identifier())
 		items = append(items, map[string]any{
 			"identifier":    acc.Identifier(),
 			"name":          acc.Name,
@@ -69,6 +70,7 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 			"has_token":     token != "",
 			"token_preview": maskSecretPreview(token),
 			"test_status":   testStatus,
+			"banned":        banned,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total, "page": page, "page_size": pageSize, "total_pages": totalPages})

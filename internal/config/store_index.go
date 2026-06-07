@@ -3,18 +3,23 @@ package config
 // rebuildIndexes must be called with the lock already held (or during init).
 func (s *Store) rebuildIndexes() {
 	prevStatus := s.accTest
+	prevBanned := s.accBanned
 	s.keyMap = make(map[string]struct{}, len(s.cfg.Keys))
 	for _, k := range s.cfg.Keys {
 		s.keyMap[k] = struct{}{}
 	}
 	s.accMap = make(map[string]int, len(s.cfg.Accounts))
 	s.accTest = make(map[string]string, len(s.cfg.Accounts))
+	s.accBanned = make(map[string]bool, len(s.cfg.Accounts))
 	for i, acc := range s.cfg.Accounts {
 		id := acc.Identifier()
 		if id != "" {
 			s.accMap[id] = i
 			if status, ok := prevStatus[id]; ok {
 				s.setAccountTestStatusLocked(acc, status, "")
+			}
+			if banned, ok := prevBanned[id]; ok && banned {
+				s.accBanned[id] = true
 			}
 		}
 	}

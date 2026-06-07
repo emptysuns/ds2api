@@ -18,6 +18,7 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	r.Post("/accounts/test", h.testSingleAccount)
 	r.Post("/accounts/test-all", h.testAllAccounts)
 	r.Post("/accounts/sessions/delete-all", h.deleteAllSessions)
+	r.Post("/accounts/clean-banned", h.cleanBannedAccounts)
 	r.Post("/test", h.testAPI)
 }
 
@@ -35,4 +36,7 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) { h.upda
 func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) { h.deleteAccount(w, r) }
 func (h *Handler) DeleteAllSessions(w http.ResponseWriter, r *http.Request) {
 	h.deleteAllSessions(w, r)
+}
+func (h *Handler) CleanBannedAccounts(w http.ResponseWriter, r *http.Request) {
+	h.cleanBannedAccounts(w, r)
 }

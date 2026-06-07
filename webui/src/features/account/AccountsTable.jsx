@@ -114,6 +114,7 @@ export default function AccountsTable({
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className={clsx(
                                         "w-2 h-2 rounded-full shrink-0",
+                                        acc.banned ? "bg-red-700 shadow-[0_0_8px_rgba(185,28,28,0.5)]" :
                                         acc.test_status === 'failed' ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
                                         isActive ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
                                         runtimeUnknown ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" : "bg-amber-500"
@@ -134,10 +135,15 @@ export default function AccountsTable({
                                             <div className="text-xs text-muted-foreground truncate mt-0.5">{acc.remark}</div>
                                         )}
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                            <span>{acc.test_status === 'failed' ? t('accountManager.testStatusFailed') : isActive ? t('accountManager.sessionActive') : runtimeUnknown ? t('accountManager.runtimeStatusUnknown') : t('accountManager.reauthRequired')}</span>
-                                            {acc.token_preview && (
+                                            <span>{acc.banned ? '⚠ 账号已封禁' : acc.test_status === 'failed' ? t('accountManager.testStatusFailed') : isActive ? t('accountManager.sessionActive') : runtimeUnknown ? t('accountManager.runtimeStatusUnknown') : t('accountManager.reauthRequired')}</span>
+                                            {acc.token_preview && !acc.banned && (
                                                 <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">
                                                     {acc.token_preview}
+                                                </span>
+                                            )}
+                                            {acc.banned && (
+                                                <span className="font-mono bg-red-700/20 text-red-500 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                                    BANNED
                                                 </span>
                                             )}
                                             {sessionCounts && sessionCounts[id] !== undefined && (

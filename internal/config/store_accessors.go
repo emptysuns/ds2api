@@ -141,6 +141,17 @@ func (s *Store) RuntimeTokenRefreshIntervalHours() int {
 	return 6
 }
 
+// RuntimeAutoCleanBanned returns whether banned accounts should be automatically
+// removed from the pool when detected during token refresh.
+func (s *Store) RuntimeAutoCleanBanned() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Runtime.AutoCleanBanned == nil {
+		return false
+	}
+	return *s.cfg.Runtime.AutoCleanBanned
+}
+
 func (s *Store) AutoDeleteSessions() bool {
 	return s.AutoDeleteMode() != "none"
 }
