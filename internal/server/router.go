@@ -22,9 +22,6 @@ import (
 	dsclient "ds2api/internal/deepseek/client"
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"ds2api/internal/httpapi/admin"
-	"ds2api/internal/prompt"
-	"ds2api/internal/promptcompat"
-	"ds2api/internal/toolcall"
 	"ds2api/internal/httpapi/claude"
 	"ds2api/internal/httpapi/gemini"
 	"ds2api/internal/httpapi/ollama"
@@ -34,6 +31,9 @@ import (
 	"ds2api/internal/httpapi/openai/responses"
 	"ds2api/internal/httpapi/openai/shared"
 	"ds2api/internal/httpapi/requestbody"
+	"ds2api/internal/prompt"
+	"ds2api/internal/promptcompat"
+	"ds2api/internal/toolcall"
 	"ds2api/internal/webui"
 )
 

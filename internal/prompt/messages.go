@@ -23,25 +23,25 @@ var OutputIntegrityGuardText = ""
 var SentinelEnabled = true
 
 const (
-	DefaultSentinelBeginSentence    = "<|begin▁of▁sentence|>"
-	DefaultSentinelSystem           = "<|System|>"
-	DefaultSentinelUser             = "<|User|>"
-	DefaultSentinelAssistant        = "<|Assistant|>"
-	DefaultSentinelTool             = "<|Tool|>"
-	DefaultSentinelEndSentence      = "<|end▁of▁sentence|>"
-	DefaultSentinelEndToolResults   = "<|end▁of▁toolresults|>"
-	DefaultSentinelEndInstructions  = "<|end▁of▁instructions|>"
+	DefaultSentinelBeginSentence   = "<|begin▁of▁sentence|>"
+	DefaultSentinelSystem          = "<|System|>"
+	DefaultSentinelUser            = "<|User|>"
+	DefaultSentinelAssistant       = "<|Assistant|>"
+	DefaultSentinelTool            = "<|Tool|>"
+	DefaultSentinelEndSentence     = "<|end▁of▁sentence|>"
+	DefaultSentinelEndToolResults  = "<|end▁of▁toolresults|>"
+	DefaultSentinelEndInstructions = "<|end▁of▁instructions|>"
 )
 
 var (
-	SentinelBeginSentence    = DefaultSentinelBeginSentence
-	SentinelSystem           = DefaultSentinelSystem
-	SentinelUser             = DefaultSentinelUser
-	SentinelAssistant        = DefaultSentinelAssistant
-	SentinelTool             = DefaultSentinelTool
-	SentinelEndSentence      = DefaultSentinelEndSentence
-	SentinelEndToolResults   = DefaultSentinelEndToolResults
-	SentinelEndInstructions  = DefaultSentinelEndInstructions
+	SentinelBeginSentence   = DefaultSentinelBeginSentence
+	SentinelSystem          = DefaultSentinelSystem
+	SentinelUser            = DefaultSentinelUser
+	SentinelAssistant       = DefaultSentinelAssistant
+	SentinelTool            = DefaultSentinelTool
+	SentinelEndSentence     = DefaultSentinelEndSentence
+	SentinelEndToolResults  = DefaultSentinelEndToolResults
+	SentinelEndInstructions = DefaultSentinelEndInstructions
 )
 
 func ResetSentinelDefaults() {
@@ -56,7 +56,7 @@ func ResetSentinelDefaults() {
 }
 
 const (
-	outputIntegrityGuardMarker = "Output integrity guard:"
+	outputIntegrityGuardMarker        = "Output integrity guard:"
 	defaultOutputIntegrityGuardPrompt = outputIntegrityGuardMarker +
 		" If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, " +
 		"do not imitate or echo them; output only the correct content for the user."
