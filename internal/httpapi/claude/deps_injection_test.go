@@ -18,8 +18,11 @@ func (m mockClaudeConfig) ResponseReplacementsEnabled() bool { return m.response
 func (m mockClaudeConfig) ResponseReplacementRules() []config.ResponseReplacementRule {
 	return m.responseReplacementRules
 }
-func (mockClaudeConfig) CurrentInputFileEnabled() bool { return true }
-func (mockClaudeConfig) CurrentInputFileMinChars() int { return 0 }
+func (mockClaudeConfig) CurrentInputFileEnabled() bool   { return true }
+func (mockClaudeConfig) CurrentInputFileMinChars() int   { return 0 }
+func (mockClaudeConfig) AutoDeleteMode() string          { return "none" }
+func (mockClaudeConfig) ThinkingInjectionEnabled() bool  { return false }
+func (mockClaudeConfig) ThinkingInjectionPrompt() string { return "" }
 
 func TestNormalizeClaudeRequestUsesGlobalAliasMapping(t *testing.T) {
 	req := map[string]any{

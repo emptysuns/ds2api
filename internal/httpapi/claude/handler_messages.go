@@ -57,8 +57,13 @@ func isClaudeVercelProxyRequest(r *http.Request) bool {
 }
 
 func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, 100<<20) // 100 MiB, matches OpenAI handler
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "too large") {
+			writeClaudeError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return true
+		}
 		if errors.Is(err, requestbody.ErrInvalidUTF8Body) {
 			writeClaudeError(w, http.StatusBadRequest, "invalid json")
 		} else {
@@ -79,10 +84,21 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 	exposeThinking := norm.Standard.Thinking
 	a, err := h.Auth.Determine(r)
 	if err != nil {
-		writeClaudeError(w, http.StatusUnauthorized, err.Error())
+		status := http.StatusUnauthorized
+		if err == auth.ErrNoAccount {
+			status = http.StatusTooManyRequests
+		}
+		writeClaudeError(w, status, err.Error())
 		return true
 	}
-	defer h.Auth.Release(a)
+	var sessionID string
+	defer func() {
+		h.autoDeleteRemoteSession(r.Context(), a, sessionID)
+		h.Auth.Release(a)
+	}()
+
+	r = r.WithContext(auth.WithAuth(r.Context(), a))
+
 	stdReq, err := h.applyCurrentInputFile(r.Context(), a, norm.Standard)
 	if err != nil {
 		status, message := mapCurrentInputFileError(err)
@@ -97,7 +113,7 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 		Standard: stdReq,
 	})
 	if stdReq.Stream {
-		h.handleClaudeDirectStream(w, r, a, stdReq, historySession)
+		h.handleClaudeDirectStream(w, r, a, stdReq, &sessionID, historySession)
 		return true
 	}
 	result, outErr := completionruntime.ExecuteNonStreamWithRetry(r.Context(), h.DS, a, stdReq, completionruntime.Options{
@@ -105,6 +121,7 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 		CurrentInputFile:     h.Store,
 		ResponseReplacements: h.responseReplacementRules(),
 	})
+	sessionID = result.SessionID
 	if outErr != nil {
 		if historySession != nil {
 			historySession.ErrorTurn(outErr.Status, outErr.Message, outErr.Code, result.Turn)
@@ -128,18 +145,40 @@ func (h *Handler) applyCurrentInputFile(ctx context.Context, a *auth.RequestAuth
 	if h == nil {
 		return stdReq, nil
 	}
+	stdReq = h.applyThinkingInjection(stdReq)
 	return (history.Service{Store: h.Store, DS: h.DS, RequestReplacements: responserewrite.ReverseRules(h.responseReplacementRules())}).ApplyCurrentInputFile(ctx, a, stdReq)
+}
+
+func (h *Handler) applyThinkingInjection(stdReq promptcompat.StandardRequest) promptcompat.StandardRequest {
+	if h == nil || h.Store == nil || !h.Store.ThinkingInjectionEnabled() || !stdReq.Thinking {
+		return stdReq
+	}
+	messages, changed := promptcompat.AppendThinkingInjectionPromptToLatestUser(stdReq.Messages, h.Store.ThinkingInjectionPrompt())
+	if !changed {
+		return stdReq
+	}
+	finalPrompt, toolNames := promptcompat.BuildOpenAIPrompt(messages, stdReq.ToolsRaw, "", stdReq.ToolChoice, stdReq.Thinking)
+	if len(toolNames) == 0 && len(stdReq.ToolNames) > 0 {
+		toolNames = stdReq.ToolNames
+	}
+	stdReq.Messages = messages
+	stdReq.FinalPrompt = finalPrompt
+	stdReq.ToolNames = toolNames
+	return stdReq
 }
 
 func mapCurrentInputFileError(err error) (int, string) {
 	return history.MapError(err)
 }
 
-func (h *Handler) handleClaudeDirectStream(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, stdReq promptcompat.StandardRequest, historySession *responsehistory.Session) {
+func (h *Handler) handleClaudeDirectStream(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, stdReq promptcompat.StandardRequest, sessionIDRef *string, historySession *responsehistory.Session) {
 	start, outErr := completionruntime.StartCompletion(r.Context(), h.DS, a, stdReq, completionruntime.Options{
 		CurrentInputFile:     h.Store,
 		ResponseReplacements: h.responseReplacementRules(),
 	})
+	if sessionIDRef != nil {
+		*sessionIDRef = start.SessionID
+	}
 	if outErr != nil {
 		if historySession != nil {
 			historySession.Error(outErr.Status, outErr.Message, outErr.Code, "", "")
@@ -148,7 +187,7 @@ func (h *Handler) handleClaudeDirectStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	streamReq := start.Request
-	h.handleClaudeStreamRealtimeWithRetry(w, r, a, start.Response, start.Payload, start.Pow, streamReq, streamReq.ResponseModel, streamReq.Messages, streamReq.Thinking, streamReq.Search, streamReq.ToolNames, streamReq.ToolsRaw, streamReq.PromptTokenText, streamReq.ToolChoice, historySession)
+	h.handleClaudeStreamRealtimeWithRetry(w, r, a, start.Response, start.Payload, start.Pow, streamReq, streamReq.ResponseModel, streamReq.Messages, streamReq.Thinking, streamReq.Search, streamReq.ToolNames, streamReq.ToolsRaw, streamReq.PromptTokenText, streamReq.ToolChoice, sessionIDRef, historySession)
 }
 
 func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store ConfigReader) bool {
@@ -366,7 +405,7 @@ func (h *Handler) handleClaudeStreamRealtime(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow string, stdReq promptcompat.StandardRequest, model string, messages []any, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, promptTokenText string, toolChoice promptcompat.ToolChoicePolicy, historySession *responsehistory.Session) {
+func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow string, stdReq promptcompat.StandardRequest, model string, messages []any, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, promptTokenText string, toolChoice promptcompat.ToolChoicePolicy, sessionIDRef *string, historySession *responsehistory.Session) {
 	if resp.StatusCode != http.StatusOK {
 		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(resp.Body)
@@ -429,6 +468,11 @@ func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *
 		OnRetryFailure: func(status int, message, code string) {
 			streamRuntime.sendErrorWithCode(status, strings.TrimSpace(message), code)
 		},
+		OnAccountSwitch: func(newSessionID string) {
+			if sessionIDRef != nil {
+				*sessionIDRef = newSessionID
+			}
+		},
 	})
 }
 
@@ -490,4 +534,40 @@ func (h *Handler) responseReplacementRules() []config.ResponseReplacementRule {
 		return nil
 	}
 	return h.Store.ResponseReplacementRules()
+}
+
+func (h *Handler) autoDeleteRemoteSession(ctx context.Context, a *auth.RequestAuth, sessionID string) {
+	if h == nil || h.Store == nil {
+		return
+	}
+	mode := h.Store.AutoDeleteMode()
+	if mode == "none" || a.DeepSeekToken == "" {
+		return
+	}
+
+	deleteBaseCtx := context.WithoutCancel(ctx)
+	deleteCtx, cancel := context.WithTimeout(deleteBaseCtx, 10*time.Second)
+	defer cancel()
+
+	switch mode {
+	case "single":
+		if sessionID == "" {
+			config.Logger.Warn("[auto_delete_sessions] skipped single-session delete because session_id is empty", "account", a.AccountID)
+			return
+		}
+		_, err := h.DS.DeleteSessionForToken(deleteCtx, a.DeepSeekToken, sessionID)
+		if err != nil {
+			config.Logger.Warn("[auto_delete_sessions] failed", "account", a.AccountID, "mode", mode, "session_id", sessionID, "error", err)
+			return
+		}
+		config.Logger.Debug("[auto_delete_sessions] success", "account", a.AccountID, "mode", mode, "session_id", sessionID)
+	case "all":
+		if err := h.DS.DeleteAllSessionsForToken(deleteCtx, a.DeepSeekToken); err != nil {
+			config.Logger.Warn("[auto_delete_sessions] failed", "account", a.AccountID, "mode", mode, "error", err)
+			return
+		}
+		config.Logger.Debug("[auto_delete_sessions] success", "account", a.AccountID, "mode", mode)
+	default:
+		config.Logger.Warn("[auto_delete_sessions] unknown mode", "account", a.AccountID, "mode", mode)
+	}
 }

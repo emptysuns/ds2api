@@ -24,10 +24,13 @@ type claudeHistoryConfig struct {
 
 func (m claudeHistoryConfig) ModelAliases() map[string]string { return m.aliases }
 
-func (m claudeHistoryConfig) ResponseReplacementsEnabled() bool { return false }
+func (m claudeHistoryConfig) ResponseReplacementsEnabled() bool                          { return false }
 func (m claudeHistoryConfig) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
-func (claudeHistoryConfig) CurrentInputFileEnabled() bool     { return false }
-func (claudeHistoryConfig) CurrentInputFileMinChars() int     { return 0 }
+func (claudeHistoryConfig) CurrentInputFileEnabled() bool                                { return false }
+func (claudeHistoryConfig) CurrentInputFileMinChars() int                                { return 0 }
+func (claudeHistoryConfig) AutoDeleteMode() string                                       { return "none" }
+func (claudeHistoryConfig) ThinkingInjectionEnabled() bool                               { return false }
+func (claudeHistoryConfig) ThinkingInjectionPrompt() string                              { return "" }
 
 func (claudeCurrentInputAuth) Determine(*http.Request) (*auth.RequestAuth, error) {
 	return &auth.RequestAuth{
@@ -112,6 +115,14 @@ func (d *claudeCurrentInputDS) CallCompletion(_ context.Context, _ *auth.Request
 		Header:     make(http.Header),
 		Body:       io.NopCloser(strings.NewReader("data: {\"p\":\"response/content\",\"v\":\"ok\"}\n")),
 	}, nil
+}
+
+func (d *claudeCurrentInputDS) DeleteSessionForToken(_ context.Context, _ string, _ string) (*dsclient.DeleteSessionResult, error) {
+	return &dsclient.DeleteSessionResult{Success: true}, nil
+}
+
+func (d *claudeCurrentInputDS) DeleteAllSessionsForToken(_ context.Context, _ string) error {
+	return nil
 }
 
 func TestClaudeDirectAppliesCurrentInputFile(t *testing.T) {

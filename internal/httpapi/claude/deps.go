@@ -19,6 +19,8 @@ type DeepSeekCaller interface {
 	GetPow(ctx context.Context, a *auth.RequestAuth, maxAttempts int) (string, error)
 	UploadFile(ctx context.Context, a *auth.RequestAuth, req dsclient.UploadFileRequest, maxAttempts int) (*dsclient.UploadFileResult, error)
 	CallCompletion(ctx context.Context, a *auth.RequestAuth, payload map[string]any, powResp string, maxAttempts int) (*http.Response, error)
+	DeleteSessionForToken(ctx context.Context, token string, sessionID string) (*dsclient.DeleteSessionResult, error)
+	DeleteAllSessionsForToken(ctx context.Context, token string) error
 }
 
 type ConfigReader interface {
@@ -27,6 +29,9 @@ type ConfigReader interface {
 	CurrentInputFileMinChars() int
 	ResponseReplacementsEnabled() bool
 	ResponseReplacementRules() []config.ResponseReplacementRule
+	AutoDeleteMode() string
+	ThinkingInjectionEnabled() bool
+	ThinkingInjectionPrompt() string
 }
 
 type OpenAIChatRunner interface {

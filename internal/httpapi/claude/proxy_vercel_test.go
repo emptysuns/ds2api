@@ -15,11 +15,13 @@ type claudeProxyStoreStub struct {
 
 func (s claudeProxyStoreStub) ModelAliases() map[string]string { return s.aliases }
 
-func (claudeProxyStoreStub) CurrentInputFileEnabled() bool { return true }
-func (claudeProxyStoreStub) CurrentInputFileMinChars() int { return 0 }
-func (m claudeProxyStoreStub) ResponseReplacementsEnabled() bool { return false }
+func (claudeProxyStoreStub) CurrentInputFileEnabled() bool                                { return true }
+func (claudeProxyStoreStub) CurrentInputFileMinChars() int                                { return 0 }
+func (m claudeProxyStoreStub) ResponseReplacementsEnabled() bool                          { return false }
 func (m claudeProxyStoreStub) ResponseReplacementRules() []config.ResponseReplacementRule { return nil }
-
+func (claudeProxyStoreStub) AutoDeleteMode() string                                       { return "none" }
+func (claudeProxyStoreStub) ThinkingInjectionEnabled() bool                               { return false }
+func (claudeProxyStoreStub) ThinkingInjectionPrompt() string                              { return "" }
 
 type openAIProxyStub struct {
 	status int
