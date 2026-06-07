@@ -200,3 +200,33 @@ func (h *Handler) updateAccountProxy(w http.ResponseWriter, r *http.Request) {
 	h.Pool.Reset()
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "proxy_id": proxyID})
 }
+
+func (h *Handler) applyProxyToAll(w http.ResponseWriter, r *http.Request) {
+	proxyID := chi.URLParam(r, "proxyID")
+	if decoded, err := url.PathUnescape(proxyID); err == nil {
+		proxyID = decoded
+	}
+	proxyID = strings.TrimSpace(proxyID)
+
+	err := h.Store.Update(func(c *config.Config) error {
+		if proxyID != "" {
+			if _, ok := findProxyByID(*c, proxyID); !ok {
+				return newRequestError("代理不存在")
+			}
+		}
+		for i := range c.Accounts {
+			c.Accounts[i].ProxyID = proxyID
+		}
+		return validateProxyMutation(c)
+	})
+	if err != nil {
+		if detail, ok := requestErrorDetail(err); ok {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"detail": detail})
+			return
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		return
+	}
+	h.Pool.Reset()
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "proxy_id": proxyID, "count": len(h.Store.Snapshot().Accounts)})
+}

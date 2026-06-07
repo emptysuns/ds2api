@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Play, Plus, Shield, Trash2, X } from 'lucide-react'
+import { Pencil, Play, Plus, Shield, Trash2, Users, X } from 'lucide-react'
 import clsx from 'clsx'
 
 import { useI18n } from '../../i18n'
@@ -79,9 +79,11 @@ function ProxiesTable({
     t,
     proxies,
     testing,
+    applyingAll,
     testResults,
     onCreate,
     onTest,
+    onApplyAll,
     onEdit,
     onDelete,
 }) {
@@ -146,6 +148,14 @@ function ProxiesTable({
                                     >
                                         <Play className="w-3.5 h-3.5" />
                                         {t('proxyManager.testAction')}
+                                    </button>
+                                    <button
+                                        onClick={() => onApplyAll(proxy)}
+                                        disabled={applyingAll[proxy.id]}
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-medium text-primary disabled:opacity-50"
+                                    >
+                                        <Users className="w-3.5 h-3.5" />
+                                        {applyingAll[proxy.id] ? t('proxyManager.applying') : t('proxyManager.applyToAll')}
                                     </button>
                                     <button
                                         onClick={() => onEdit(proxy)}
@@ -315,6 +325,7 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
     const [form, setForm] = useState(createEmptyProxyForm())
     const [saving, setSaving] = useState(false)
     const [testing, setTesting] = useState({})
+    const [applyingAll, setApplyingAll] = useState({})
     const [testResults, setTestResults] = useState({})
 
     const proxies = config?.proxies || []
@@ -421,6 +432,28 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
         }
     }
 
+    const applyProxyToAll = async (proxy) => {
+        const name = proxy.name || `${proxy.host}:${proxy.port}`
+        if (!confirm(t('proxyManager.applyToAllConfirm', { name }))) return
+        setApplyingAll(prev => ({ ...prev, [proxy.id]: true }))
+        try {
+            const res = await apiFetch(`/admin/proxies/${encodeURIComponent(proxy.id)}/apply-all`, {
+                method: 'PUT',
+            })
+            const data = await readApiResponse(res, t('settings.nonJsonResponse', { status: res.status }))
+            if (!res.ok) {
+                onMessage('error', data.detail || t('messages.requestFailed'))
+                return
+            }
+            await onRefresh?.()
+            onMessage('success', t('proxyManager.applyToAllSuccess', { count: data.count ?? 0 }))
+        } catch (err) {
+            onMessage('error', err?.message || t('messages.networkError'))
+        } finally {
+            setApplyingAll(prev => ({ ...prev, [proxy.id]: false }))
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">
@@ -442,9 +475,11 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
                 t={t}
                 proxies={proxies}
                 testing={testing}
+                applyingAll={applyingAll}
                 testResults={testResults}
                 onCreate={openCreate}
                 onTest={testProxy}
+                onApplyAll={applyProxyToAll}
                 onEdit={openEdit}
                 onDelete={deleteProxy}
             />
